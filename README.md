@@ -1,2 +1,15 @@
-# order-book-trading-bot
-Custom-built high-frequency trading simulator featuring a priority-based order book, limit/market order matching engine, and real-time P&amp;L tracking for market-making strategies. Designed to model core microstructure behaviors found in modern electronic exchanges.
+# High-Frequency Trading Simulator
+
+This is a Python-based HFT simulator with a custom-built order book, trade matching engine, and P&L tracking system. Inspired by real exchange mechanics.
+
+## Features
+- Limit & Market Order Support
+- Priority-based Matching (Heap Queue)
+- P&L Tracking for Market-Making Bots
+- Custom Strategy Integration
+
+## Status
+🚧 Work in progress. Actively developing logic for strategy execution and multi-agent competition.
+
+## Author
+Krish B. Shah
