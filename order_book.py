@@ -23,26 +23,53 @@ class Order:
         else:
             return (self.price, self.timestamp) < (other.price, other.timestamp)
 
-
 class OrderBook:
     def __init__(self):
-        self.buy_orders = []   # Max-heap (by price)
-        self.sell_orders = []  # Min-heap (by price)
+        self.buy_orders = []
+        self.sell_orders = []
         self.trade_log = []
 
     def add_order(self, order):
         if order.order_type == "market":
-            if order.side == "buy" and not self.sell_orders:
-                print(f"❌ Rejected market buy {order.order_id}: no sellers")
-                return
-            if order.side == "sell" and not self.buy_orders:
-                print(f"❌ Rejected market sell {order.order_id}: no buyers")
-                return
+            self.execute_market_order(order)
+            return
 
         if order.side == "buy":
             heapq.heappush(self.buy_orders, order)
         elif order.side == "sell":
             heapq.heappush(self.sell_orders, order)
+
+    def execute_market_order(self, market_order):
+        book_side = self.sell_orders if market_order.side == "buy" else self.buy_orders
+        original_qty = market_order.quantity
+
+        while market_order.quantity > 0 and book_side:
+            resting_order = book_side[0]
+            trade_qty = min(market_order.quantity, resting_order.quantity)
+            trade_price = resting_order.price
+
+            self.trade_log.append({
+                "price": trade_price,
+                "quantity": trade_qty,
+                "timestamp": time.time()
+            })
+
+            if market_order.owner:
+                market_order.owner.updateProfitAndLoss(trade_price, trade_qty, market_order.side)
+            if resting_order.owner:
+                resting_order.owner.updateProfitAndLoss(trade_price, trade_qty, resting_order.side)
+
+            market_order.quantity -= trade_qty
+            resting_order.quantity -= trade_qty
+
+            if resting_order.quantity == 0:
+                heapq.heappop(book_side)
+
+        if market_order.quantity > 0:
+            if market_order.quantity < original_qty:
+                print(f"⚠️ Market order {market_order.order_id} partially filled, {market_order.quantity} units discarded.")
+            else:
+                print(f"❌ Market order {market_order.order_id} could not be filled at all (no counterparties).")
 
     def match(self):
         while self.buy_orders and self.sell_orders:
@@ -52,13 +79,12 @@ class OrderBook:
             if best_buy.price >= best_sell.price:
                 trade_qty = min(best_buy.quantity, best_sell.quantity)
 
-                # ✅ Proper trade price logic
                 if best_buy.order_type == "market" and best_sell.order_type != "market":
                     trade_price = best_sell.price
                 elif best_sell.order_type == "market" and best_buy.order_type != "market":
                     trade_price = best_buy.price
                 elif best_buy.order_type == "market" and best_sell.order_type == "market":
-                    trade_price = 0  # fallback (this shouldn't happen in real markets)
+                    trade_price = 0
                 else:
                     trade_price = best_sell.price
 
@@ -85,24 +111,6 @@ class OrderBook:
                     heapq.heappop(self.sell_orders)
             else:
                 break
-
-        # Remove unmatched market orders (they must not persist)
-        if self.buy_orders and self.buy_orders[0].order_type == "market":
-            removed = heapq.heappop(self.buy_orders)
-            print(f"⚠️ Removed unfilled market BUY order: {removed.order_id}")
-
-        if self.sell_orders and self.sell_orders[0].order_type == "market":
-            removed = heapq.heappop(self.sell_orders)
-            print(f"⚠️ Removed unfilled market SELL order: {removed.order_id}")
-
-        # Clean up empty limit orders still in heap (edge case)
-        if self.buy_orders and self.buy_orders[0].quantity == 0:
-            removed = heapq.heappop(self.buy_orders)
-            print(f"🧹 Removed empty BUY order: {removed.order_id}")
-
-        if self.sell_orders and self.sell_orders[0].quantity == 0:
-            removed = heapq.heappop(self.sell_orders)
-            print(f"🧹 Removed empty SELL order: {removed.order_id}")
 
     def print_book(self):
         print("Buy Orders:")
