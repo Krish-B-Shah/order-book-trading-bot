@@ -6,38 +6,92 @@ class Order:
         self.order_id = order_id
         self.side = side  # "buy" or "sell"
         self.order_type = order_type  # "limit" or "market"
-        self.owner = owner  # Link to strategy object (e.g., bot)
-
-        if self.order_type == "market":
-            self.price = float('inf') if side == "buy" else 0
-        else:
-            self.price = price
-
+        self.owner = owner
+        self.price = float('inf') if order_type == "market" and side == "buy" else \
+                     0 if order_type == "market" and side == "sell" else price
         self.quantity = quantity
         self.timestamp = timestamp or time.time()
 
     def __lt__(self, other):
-        # For heapq: buy = max-heap, sell = min-heap
         if self.side == "buy":
             return (-self.price, self.timestamp) < (-other.price, other.timestamp)
         else:
             return (self.price, self.timestamp) < (other.price, other.timestamp)
 
+
 class OrderBook:
     def __init__(self):
+        self.global_order_id = 0
         self.buy_orders = []
         self.sell_orders = []
         self.trade_log = []
+        self.order_map = {}  # ✅ was incorrectly named orderMap
+        self.all_orders = []  # ✅ order history
+
+    def next_order_id(self):
+        self.global_order_id += 1
+        return self.global_order_id
 
     def add_order(self, order):
         if order.order_type == "market":
             self.execute_market_order(order)
+            self.all_orders.append(order)
             return
+
+        if order.order_id in self.order_map:
+            raise ValueError(f"Duplicate Order ID: {order.order_id}")
+
+        self.order_map[order.order_id] = order
+        self.all_orders.append(order)
 
         if order.side == "buy":
             heapq.heappush(self.buy_orders, order)
         elif order.side == "sell":
             heapq.heappush(self.sell_orders, order)
+
+    def cancel_order(self, order_id):
+        order = self.order_map.get(order_id)
+        if order is None:
+            print(f"❌ Order ID {order_id} not found. Cannot cancel.")
+            return False
+
+        if order.side == "buy":
+            self.buy_orders = [o for o in self.buy_orders if o.order_id != order_id]
+            heapq.heapify(self.buy_orders)
+        elif order.side == "sell":
+            self.sell_orders = [o for o in self.sell_orders if o.order_id != order_id]
+            heapq.heapify(self.sell_orders)
+
+        del self.order_map[order_id]
+        print(f"✅ Canceled order {order_id}")
+        return True
+
+    def amend_order(self, order_id, new_price=None, new_quantity=None):
+        order = self.order_map.get(order_id)
+        if order is None:
+            print(f"❌ Order ID {order_id} not found. Cannot amend.")
+            return False
+
+        if order.side == "buy":
+            self.buy_orders = [o for o in self.buy_orders if o.order_id != order_id]
+            heapq.heapify(self.buy_orders)
+        elif order.side == "sell":
+            self.sell_orders = [o for o in self.sell_orders if o.order_id != order_id]
+            heapq.heapify(self.sell_orders)
+
+        if new_price is not None:
+            order.price = new_price
+        if new_quantity is not None:
+            order.quantity = new_quantity
+
+        self.add_order(order)
+        print(f"✅ Amended order {order_id}")
+        return True
+
+    def get_best_bid_ask(self):
+        best_bid = self.buy_orders[0].price if self.buy_orders else None
+        best_ask = self.sell_orders[0].price if self.sell_orders else None
+        return best_bid, best_ask
 
     def execute_market_order(self, market_order):
         book_side = self.sell_orders if market_order.side == "buy" else self.buy_orders
@@ -64,12 +118,13 @@ class OrderBook:
 
             if resting_order.quantity == 0:
                 heapq.heappop(book_side)
+                self.order_map.pop(resting_order.order_id, None)
 
         if market_order.quantity > 0:
             if market_order.quantity < original_qty:
                 print(f"⚠️ Market order {market_order.order_id} partially filled, {market_order.quantity} units discarded.")
             else:
-                print(f"❌ Market order {market_order.order_id} could not be filled at all (no counterparties).")
+                print(f"❌ Market order {market_order.order_id} could not be filled at all.")
 
     def match(self):
         while self.buy_orders and self.sell_orders:
@@ -78,18 +133,7 @@ class OrderBook:
 
             if best_buy.price >= best_sell.price:
                 trade_qty = min(best_buy.quantity, best_sell.quantity)
-
-                if best_buy.order_type == "market" and best_sell.order_type != "market":
-                    trade_price = best_sell.price
-                elif best_sell.order_type == "market" and best_buy.order_type != "market":
-                    trade_price = best_buy.price
-                elif best_buy.order_type == "market" and best_sell.order_type == "market":
-                    trade_price = 0
-                else:
-                    trade_price = best_sell.price
-
-                if trade_qty <= 0:
-                    break
+                trade_price = best_sell.price
 
                 self.trade_log.append({
                     "price": trade_price,
@@ -107,8 +151,10 @@ class OrderBook:
 
                 if best_buy.quantity == 0:
                     heapq.heappop(self.buy_orders)
+                    self.order_map.pop(best_buy.order_id, None)
                 if best_sell.quantity == 0:
                     heapq.heappop(self.sell_orders)
+                    self.order_map.pop(best_sell.order_id, None)
             else:
                 break
 

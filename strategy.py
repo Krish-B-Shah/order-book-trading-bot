@@ -1,42 +1,29 @@
-from order_book import Order
-import time
+from order_book import Order, OrderBook
+from strategy import MarketMakingStrategy
 
-class MarketMakingStrategy:
-    def __init__(self, starting_cash=10000):
-        self.cash = starting_cash
-        self.inventory = 0
-        self.order_id_counter = 100
-        self.pNL = 0
+book = OrderBook()
+bot = MarketMakingStrategy(order_book=book)
 
-    def _next_id(self):
-        self.order_id_counter += 1
-        return self.order_id_counter
+# Initial market orders
+book.add_order(Order(order_id=book.next_order_id(), side="buy", price=99, quantity=105, order_type="limit"))
+book.add_order(Order(order_id=book.next_order_id(), side="sell", price=101, quantity=100, order_type="limit"))
+book.add_order(Order(order_id=book.next_order_id(), side="sell", price=101, quantity=5, order_type="market", owner=bot))
+book.add_order(Order(order_id=book.next_order_id(), side="buy", price=101, quantity=5, order_type="market", owner=bot))
 
-    def generate_orders(self, current_bid, current_ask, order_type="limit"):
-        if order_type != "limit":
-            buy_price = current_ask
-            sell_price = current_bid
-        else:
-            mid_price = (current_bid + current_ask) / 2
-            buy_price = mid_price - 1
-            sell_price = mid_price + 1
+# Market making loop
+for _ in range(10):
+    bid, ask = book.get_best_bid_ask()
+    bot_orders = bot.generate_orders(bid or 98, ask or 102)
+    for order in bot_orders:
+        book.add_order(order)
+    book.match()
+    print(f"P&L: {bot.pNL:.2f} | Cash: {bot.cash:.2f} | Inventory: {bot.inventory}")
+    print("-" * 50)
 
-        quantity = 1
-        return [
-            Order(order_id=self._next_id(), side="buy", price=buy_price, quantity=quantity, order_type=order_type, owner=self),
-            Order(order_id=self._next_id(), side="sell", price=sell_price, quantity=quantity, order_type=order_type, owner=self)
-        ]
+# Final state
+print("\nTrades executed:")
+for trade in book.trade_log:
+    print(trade)
 
-    def updateProfitAndLoss(self, trade_price, trade_quantity, side):
-        if side == "buy":
-            self.inventory += trade_quantity
-            self.cash -= trade_price * trade_quantity
-        elif side == "sell":
-            self.inventory -= trade_quantity
-            self.cash += trade_price * trade_quantity
-
-        self.pNL = self.cash + (self.inventory * trade_price) - 10000
-        if self.pNL < 0:
-            print(f"⚠️ Warning: Negative P&L of {self.pNL:.2f}")
-        else: 
-            print(f"✅ P&L is {self.pNL:.2f}")
+print("\nRemaining Order Book:")
+book.print_book()

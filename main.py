@@ -1,33 +1,46 @@
-from order_book import Order, OrderBook
-from strategy import MarketMakingStrategy
-import time
+from order_book import Order
 
-book = OrderBook()
-bot = MarketMakingStrategy()
+class MarketMakingStrategy:
+    def __init__(self, starting_cash=10000, order_book=None):
+        self.cash = starting_cash
+        self.inventory = 0
+        self.pNL = 0
+        self.max_inventory = 10
+        self.order_book = order_book
 
-# Initial market simulation
-book.add_order(Order(order_id=2, side="buy", price=99, quantity=105, order_type="limit"))
-book.add_order(Order(order_id=1, side="sell", price=101, quantity=100, order_type="limit"))
-book.add_order(Order(order_id=999, side="sell", price=101, quantity=5, order_type="market", owner=bot))
-book.add_order(Order(order_id=1000, side="buy", price=101, quantity=5, order_type="market", owner=bot))  # changed to match resting sell
+    def _next_id(self):
+        return self.order_book.next_order_id()
 
-# Market making loop
-current_bid = 99
-current_ask = 101
+    def generate_orders(self, current_bid, current_ask, order_type="limit"):
+        if order_type != "limit":
+            buy_price = current_ask
+            sell_price = current_bid
+        else:
+            mid_price = (current_bid + current_ask) / 2
+            buy_price = mid_price - 1
+            sell_price = mid_price + 1
 
-for _ in range(10):
-    bot_orders = bot.generate_orders(current_bid, current_ask)
-    for order in bot_orders:
-        book.add_order(order)
-    book.match()
+        quantity = 1
+        orders = []
 
-    print(f"P&L: {bot.pNL:.2f} | Cash: {bot.cash:.2f} | Inventory: {bot.inventory}")
-    print("-" * 50)
+        if self.inventory < self.max_inventory:
+            orders.append(Order(order_id=self._next_id(), side="buy", price=buy_price, quantity=quantity, order_type=order_type, owner=self))
 
-# Final trade log and book state
-print("\nTrades executed:")
-for trade in book.trade_log:
-    print(trade)
+        if self.inventory > -self.max_inventory:
+            orders.append(Order(order_id=self._next_id(), side="sell", price=sell_price, quantity=quantity, order_type=order_type, owner=self))
 
-print("\nRemaining Order Book:")
-book.print_book()
+        return orders
+
+    def updateProfitAndLoss(self, trade_price, trade_quantity, side):
+        if side == "buy":
+            self.inventory += trade_quantity
+            self.cash -= trade_price * trade_quantity
+        elif side == "sell":
+            self.inventory -= trade_quantity
+            self.cash += trade_price * trade_quantity
+
+        self.pNL = self.cash + (self.inventory * trade_price) - 10000
+        if self.pNL < 0:
+            print(f"⚠️ Warning: Negative P&L of {self.pNL:.2f}")
+        else:
+            print(f"✅ P&L is {self.pNL:.2f}")
