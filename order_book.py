@@ -1,5 +1,6 @@
 import heapq
 import time
+import csv
 
 class Order:
     def __init__(self, order_id, side, price, quantity, order_type, owner=None, timestamp=None):
@@ -25,8 +26,8 @@ class OrderBook:
         self.buy_orders = []
         self.sell_orders = []
         self.trade_log = []
-        self.order_map = {}  # ✅ was incorrectly named orderMap
-        self.all_orders = []  # ✅ order history
+        self.order_map = {}   
+        self.all_orders = [] 
 
     def next_order_id(self):
         self.global_order_id += 1
@@ -165,3 +166,21 @@ class OrderBook:
         print("Sell Orders:")
         for order in sorted(self.sell_orders):
             print(vars(order))
+
+
+  def export_all_orders(self, filename="order_history.csv"):
+    with open(filename, mode='w', newline='') as csvfile:
+        fieldNames = ["Order ID", "Side", "Price", "Quantity", "Order Type", "Owner", "Timestamp"]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
+        writer.writeheader()
+        for order in self.all_orders:
+            writer.writerow({
+                "Order ID": order.order_id,
+                "Side": order.side,
+                "Price": order.price,
+                "Quantity": order.quantity,
+                "Order Type": order.order_type,
+                "Owner": str(order.owner) if order.owner else None,
+                "Timestamp": order.timestamp
+            })
+    print(f"Order history exported to {filename}")
