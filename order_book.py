@@ -168,19 +168,19 @@ class OrderBook:
             print(vars(order))
 
 
-  def export_all_orders(self, filename="order_history.csv"):
-    with open(filename, mode='w', newline='') as csvfile:
-        fieldNames = ["Order ID", "Side", "Price", "Quantity", "Order Type", "Owner", "Timestamp"]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
-        writer.writeheader()
-        for order in self.all_orders:
-            writer.writerow({
-                "Order ID": order.order_id,
-                "Side": order.side,
-                "Price": order.price,
-                "Quantity": order.quantity,
-                "Order Type": order.order_type,
-                "Owner": str(order.owner) if order.owner else None,
-                "Timestamp": order.timestamp
-            })
-    print(f"Order history exported to {filename}")
+    def export_all_orders(self, filename="order_history.csv"):
+        with open(filename, mode='w', newline='') as csvfile:
+            fieldNames = ["Order ID", "Side", "Price", "Quantity", "Order Type", "Owner", "Timestamp"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldNames)
+            writer.writeheader()
+            for order in self.all_orders:
+                writer.writerow({
+                    "Order ID": order.order_id,
+                    "Side": order.side,
+                    "Price": order.price,
+                    "Quantity": order.quantity,
+                    "Order Type": order.order_type,
+                    "Owner": str(order.owner) if order.owner else None,
+                    "Timestamp": order.timestamp
+                })
+        print(f"Order history exported to {filename}")
