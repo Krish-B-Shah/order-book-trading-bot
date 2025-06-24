@@ -110,9 +110,9 @@ class OrderBook:
             })
 
             if market_order.owner:
-                market_order.owner.updateProfitAndLoss(trade_price, trade_qty, market_order.side)
+                market_order.owner.updateProfitAndLoss(trade_price, trade_qty, market_order.side, trade_price)
             if resting_order.owner:
-                resting_order.owner.updateProfitAndLoss(trade_price, trade_qty, resting_order.side)
+                resting_order.owner.updateProfitAndLoss(trade_price, trade_qty, resting_order.side, trade_price)
 
             market_order.quantity -= trade_qty
             resting_order.quantity -= trade_qty
@@ -143,9 +143,9 @@ class OrderBook:
                 })
 
                 if best_buy.owner:
-                    best_buy.owner.updateProfitAndLoss(trade_price, trade_qty, "buy")
+                    best_buy.owner.updateProfitAndLoss(trade_price, trade_qty, "buy", trade_price)
                 if best_sell.owner:
-                    best_sell.owner.updateProfitAndLoss(trade_price, trade_qty, "sell")
+                    best_sell.owner.updateProfitAndLoss(trade_price, trade_qty, "sell", trade_price)
 
                 best_buy.quantity -= trade_qty
                 best_sell.quantity -= trade_qty

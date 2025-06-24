@@ -31,7 +31,7 @@ class MarketMakingStrategy:
 
         return orders
 
-    def updateProfitAndLoss(self, trade_price, trade_quantity, side):
+    def updateProfitAndLoss(self, trade_price, trade_quantity, side, current_price):
         if side == "buy":
             self.inventory += trade_quantity
             self.cash -= trade_price * trade_quantity
@@ -39,7 +39,7 @@ class MarketMakingStrategy:
             self.inventory -= trade_quantity
             self.cash += trade_price * trade_quantity
 
-        self.pNL = self.cash + (self.inventory * trade_price) - 10000
+        self.pNL = self.cash + (self.inventory * current_price) - 10000
         if self.pNL < 0:
             print(f"⚠️ Warning: Negative P&L of {self.pNL:.2f}")
         else:
