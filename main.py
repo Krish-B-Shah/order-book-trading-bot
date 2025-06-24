@@ -1,6 +1,7 @@
 from order_book import Order, OrderBook
 from strategy import MarketMakingStrategy
 from matplotlib import pyplot as plt
+import random
 
 # episodes = list(range(1, 6))
 # profits = [20, -5, 15, 10, -3]
@@ -35,6 +36,13 @@ for round_num in range(NUM_ROUNDS):
     bot_orders = bot.generate_orders(bid or 98, ask or 102)
     for order in bot_orders:
         book.add_order(order)
+
+    if random.random() < 0.5:
+        book.add_order(Order(order_id=book.next_order_id(), side="buy", price=0, quantity=1, order_type="market"))
+    if random.random() < 0.5:
+        book.add_order(Order(order_id=book.next_order_id(), side="sell", price=0, quantity=1, order_type="market"))
+
+
     book.match()
     rounds.append(round_num)
     pnlHistory.append(bot.pNL)
