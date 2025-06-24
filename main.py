@@ -4,10 +4,10 @@ from matplotlib import pyplot as plt
 import random
 import yfinance as yf
 
-ticker = yf.Ticker("AAPL")
-price = ticker.history(period="1d", interval="1m")  # 1-minute resolution
+ticker = yf.Ticker("AMZN")
+price = ticker.history(period="5d", interval="5m")  # 5-minute resolution
 latest_price = price["Close"].iloc[-1]  # Most recent price
-print(f"Live AAPL price: {latest_price}")
+print(f"Live AMZN price: {latest_price}")
 
 
 
@@ -55,7 +55,7 @@ for round_num in range(NUM_ROUNDS):
         book.add_order(Order(order_id=book.next_order_id(), side="sell", price=0, quantity=1, order_type="market"))
 
 
-    book.match()
+    book.match(mid_price)
     rounds.append(round_num)
     pnlHistory.append(bot.pNL)
 

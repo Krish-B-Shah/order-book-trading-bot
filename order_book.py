@@ -32,10 +32,14 @@ class OrderBook:
     def next_order_id(self):
         self.global_order_id += 1
         return self.global_order_id
+    def get_last_trade_price(self):
+        if self.trade_log:
+            return self.trade_log[-1]['price']
+        return None
 
     def add_order(self, order):
         if order.order_type == "market":
-            self.execute_market_order(order)
+            self.execute_market_order(order, current_price=self.get_last_trade_price() or 100.0)
             self.all_orders.append(order)
             return
 
@@ -94,7 +98,7 @@ class OrderBook:
         best_ask = self.sell_orders[0].price if self.sell_orders else None
         return best_bid, best_ask
 
-    def execute_market_order(self, market_order):
+    def execute_market_order(self, market_order, current_price=None):
         book_side = self.sell_orders if market_order.side == "buy" else self.buy_orders
         original_qty = market_order.quantity
 
@@ -110,9 +114,9 @@ class OrderBook:
             })
 
             if market_order.owner:
-                market_order.owner.updateProfitAndLoss(trade_price, trade_qty, market_order.side, trade_price)
+                market_order.owner.updateProfitAndLoss(trade_price, trade_qty, market_order.side)
             if resting_order.owner:
-                resting_order.owner.updateProfitAndLoss(trade_price, trade_qty, resting_order.side, trade_price)
+                resting_order.owner.updateProfitAndLoss(trade_price, trade_qty, resting_order.side)
 
             market_order.quantity -= trade_qty
             resting_order.quantity -= trade_qty
@@ -127,7 +131,7 @@ class OrderBook:
             else:
                 print(f"❌ Market order {market_order.order_id} could not be filled at all.")
 
-    def match(self):
+    def match(self, current_price):
         while self.buy_orders and self.sell_orders:
             best_buy = self.buy_orders[0]
             best_sell = self.sell_orders[0]
@@ -143,9 +147,9 @@ class OrderBook:
                 })
 
                 if best_buy.owner:
-                    best_buy.owner.updateProfitAndLoss(trade_price, trade_qty, "buy", trade_price)
+                    best_buy.owner.updateProfitAndLoss(trade_price, trade_qty, "buy", current_price)
                 if best_sell.owner:
-                    best_sell.owner.updateProfitAndLoss(trade_price, trade_qty, "sell", trade_price)
+                    best_sell.owner.updateProfitAndLoss(trade_price, trade_qty, "sell", current_price)
 
                 best_buy.quantity -= trade_qty
                 best_sell.quantity -= trade_qty
