@@ -12,37 +12,17 @@ print(f"Live AMZN price: {latest_price}")
 
 
 
-# episodes = list(range(1, 6))
-# profits = [20, -5, 15, 10, -3]
-
-# plt.bar(episodes, profits)
-# plt.xlabel('Round')
-# plt.ylabel('P&L')
-# plt.title('Profit and Loss Over Time')
-# plt.axhline(0, color='black', linewidth=0.8)
-# plt.show()
-
-
-
-
 
 book = OrderBook()
 bot = MarketMakingStrategy(order_book=book)
 
-# Initial market orders
-# book.add_order(Order(order_id=book.next_order_id(), side="buy", price=99, quantity=105, order_type="limit"))
-# book.add_order(Order(order_id=book.next_order_id(), side="sell", price=101, quantity=100, order_type="limit"))
-# book.add_order(Order(order_id=book.next_order_id(), side="sell", price=101, quantity=5, order_type="market", owner=bot))
-# book.add_order(Order(order_id=book.next_order_id(), side="buy", price=101, quantity=5, order_type="market", owner=bot))
-
-# Market making loop
 
 rounds  = []
 pnlHistory = []
 NUM_ROUNDS = int(input("Enter number of simulation rounds: "))
 for round_num in range(NUM_ROUNDS):
     mid_price = latest_price + random.uniform(-0.5, 0.5)  # Simulate real-world noise
-    spread = 2  # You can customize this
+    spread = 5  # You can customize this
     bid = mid_price - spread / 2
     ask = mid_price + spread / 2
     bot_orders = bot.generate_orders(bid, ask)

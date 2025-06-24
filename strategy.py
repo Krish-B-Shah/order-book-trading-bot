@@ -1,4 +1,4 @@
-from order_book import Order
+from order_book import Order, OrderBook
 
 class MarketMakingStrategy:
     def __init__(self, starting_cash=10000, order_book=None):
@@ -6,7 +6,7 @@ class MarketMakingStrategy:
         self.inventory = 0
         self.pNL = 0
         self.max_inventory = 10
-        self.order_book = order_book
+        self.order_book = order_book or OrderBook()
 
     def _next_id(self):
         return self.order_book.next_order_id()
