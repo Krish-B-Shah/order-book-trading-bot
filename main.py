@@ -1,5 +1,20 @@
 from order_book import Order, OrderBook
 from strategy import MarketMakingStrategy
+from matplotlib import pyplot as plt
+
+episodes = list(range(1, 6))
+profits = [20, -5, 15, 10, -3]
+
+plt.bar(episodes, profits)
+plt.xlabel('Round')
+plt.ylabel('P&L')
+plt.title('Profit and Loss Over Time')
+plt.axhline(0, color='black', linewidth=0.8)
+plt.show()
+
+
+
+
 
 book = OrderBook()
 bot = MarketMakingStrategy(order_book=book)
