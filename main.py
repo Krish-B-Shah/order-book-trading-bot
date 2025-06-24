@@ -2,6 +2,15 @@ from order_book import Order, OrderBook
 from strategy import MarketMakingStrategy
 from matplotlib import pyplot as plt
 import random
+import yfinance as yf
+
+ticker = yf.Ticker("AAPL")
+price = ticker.history(period="1d", interval="1m")  # 1-minute resolution
+latest_price = price["Close"].iloc[-1]  # Most recent price
+print(f"Live AAPL price: {latest_price}")
+
+
+
 
 # episodes = list(range(1, 6))
 # profits = [20, -5, 15, 10, -3]
@@ -21,10 +30,10 @@ book = OrderBook()
 bot = MarketMakingStrategy(order_book=book)
 
 # Initial market orders
-book.add_order(Order(order_id=book.next_order_id(), side="buy", price=99, quantity=105, order_type="limit"))
-book.add_order(Order(order_id=book.next_order_id(), side="sell", price=101, quantity=100, order_type="limit"))
-book.add_order(Order(order_id=book.next_order_id(), side="sell", price=101, quantity=5, order_type="market", owner=bot))
-book.add_order(Order(order_id=book.next_order_id(), side="buy", price=101, quantity=5, order_type="market", owner=bot))
+# book.add_order(Order(order_id=book.next_order_id(), side="buy", price=99, quantity=105, order_type="limit"))
+# book.add_order(Order(order_id=book.next_order_id(), side="sell", price=101, quantity=100, order_type="limit"))
+# book.add_order(Order(order_id=book.next_order_id(), side="sell", price=101, quantity=5, order_type="market", owner=bot))
+# book.add_order(Order(order_id=book.next_order_id(), side="buy", price=101, quantity=5, order_type="market", owner=bot))
 
 # Market making loop
 
@@ -32,8 +41,11 @@ rounds  = []
 pnlHistory = []
 NUM_ROUNDS = int(input("Enter number of simulation rounds: "))
 for round_num in range(NUM_ROUNDS):
-    bid, ask = book.get_best_bid_ask()
-    bot_orders = bot.generate_orders(bid or 98, ask or 102)
+    mid_price = latest_price + random.uniform(-0.5, 0.5)  # Simulate real-world noise
+    spread = 2  # You can customize this
+    bid = mid_price - spread / 2
+    ask = mid_price + spread / 2
+    bot_orders = bot.generate_orders(bid, ask)
     for order in bot_orders:
         book.add_order(order)
 
