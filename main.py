@@ -1,14 +1,30 @@
 from order_book import Order, OrderBook
 from strategy import MarketMakingStrategy
 from matplotlib import pyplot as plt
+from typing import List
 import random
 import yfinance as yf
 
-ticker = yf.Ticker("AMZN")
-price = ticker.history(period="5d", interval="5m")  # 5-minute resolution
-latest_price = price["Close"].iloc[-1]  # Most recent price
-print(f"Live AMZN price: {latest_price}")
 
+
+def get_initial_price():
+    try:
+        ticker = yf.Ticker("AMZN")
+        price_data = ticker.history(period="1d", interval="1m")
+        if not price_data.empty:
+            latest_price = float(price_data["Close"].iloc[-1])
+            print(f"📈 Using live AMZN price: ${latest_price:.2f}")
+            return latest_price
+        else:
+            print(f"⚠️ No live data available, using default price: $100.00")
+            return 100.0
+    except ImportError:
+        print(f"⚠️ yfinance not available, using default price: $100.00")
+        return 100.0
+    except Exception as e:
+        print(f"⚠️ Error fetching live data: {e}")
+        print(f"Using default price: $100.00")
+        return 100.0
 
 
 
