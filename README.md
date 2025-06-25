@@ -31,10 +31,19 @@ Inspired by real-world trading infrastructure, this simulator provides a foundat
 ## 📂 Project Structure
 
 order-book-trading-bot/
+
 ├── main.py # Main simulation loop
+
+
 ├── order_book.py # Core Order and OrderBook logic
+
+
 ├── strategy.py # Market-making strategy logic
+
+
 ├── requirements.txt # Python dependencies
+
+
 ├── README.md # You're reading it
 └── assets/
 └── pnl-chart.png # Sample P&L output
