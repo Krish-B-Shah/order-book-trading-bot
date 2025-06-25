@@ -1,28 +1,38 @@
 from order_book import Order, OrderBook
+from typing import List, Dict, Any, Optional
 
 class MarketMakingStrategy:
-    def __init__(self, starting_cash=10000, order_book=None):
+    def __init__(self, starting_cash: float = 10000, order_book: Optional[OrderBook] = None, 
+                 max_inventory: int = 10, spread: float = 2.0):
+        self.starting_cash = starting_cash
         self.cash = starting_cash
         self.inventory = 0
-        self.pNL = 0
-        self.max_inventory = 10
-        self.order_book = order_book or OrderBook()
+        self.pnl = 0.0
+        self.max_inventory = max_inventory
+        self.spread = spread
+        self.order_book = order_book
+        self.active_orders: List[int] = []  # Track active order IDs
 
     def _next_id(self):
+        if not self.order_book:
+            raise ValueError("Order book is not initialized.")
         return self.order_book.next_order_id()
 
     def generate_orders(self, current_bid, current_ask, order_type="limit"):
-        if order_type != "limit":
+        orders = []
+        if order_type == "market":
+            # For market orders, use current bid/ask directly
             buy_price = current_ask
             sell_price = current_bid
         else:
+            # For limit orders, place inside the spread
             mid_price = (current_bid + current_ask) / 2
-            buy_price = mid_price - 1
-            sell_price = mid_price + 1
+            half_spread = self.spread / 2
+            buy_price = mid_price - half_spread
+            sell_price = mid_price + half_spread
 
         quantity = 1
-        orders = []
-
+        
         if self.inventory < self.max_inventory:
             orders.append(Order(order_id=self._next_id(), side="buy", price=buy_price, quantity=quantity, order_type=order_type, owner=self))
 
