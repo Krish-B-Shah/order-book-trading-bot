@@ -18,6 +18,8 @@ class Order:
             return (-self.price, self.timestamp) < (-other.price, other.timestamp)
         else:
             return (self.price, self.timestamp) < (other.price, other.timestamp)
+    def __repr__(self) -> str:
+        return f"Order({self.order_id}, {self.side}, ${self.price:.2f}, {self.quantity}, {self.order_type})"
 
 
 class OrderBook:
