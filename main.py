@@ -42,6 +42,17 @@ def simulate_market_conditions(base_price):
 # book = OrderBook()
 # bot = MarketMakingStrategy(order_book=book)
 
+def create_random_market_order():
+    side = random.choice(["buy", "sell"])
+    quantity = random.randint(1, 5)
+
+    return Order(
+        order_id=book.next_order_id(),
+        side=side,
+        price=0,
+        quantity=quantity,
+        order_type="market"
+    )
 
 rounds  = []
 pnlHistory = []
