@@ -32,15 +32,34 @@ class MarketMakingStrategy:
             sell_price = mid_price + half_spread
 
         quantity = 1
-        
-        if self.inventory < self.max_inventory:
-            orders.append(Order(order_id=self._next_id(), side="buy", price=buy_price, quantity=quantity, order_type=order_type, owner=self))
 
+        if self.inventory < self.max_inventory:
+                buy_order = Order(
+                    order_id=self._next_id(),
+                    side="buy",
+                    price=buy_price,
+                    quantity=quantity,
+                    order_type=order_type,
+                    owner=self
+                )
+                orders.append(buy_order)
+                self.active_orders.append(buy_order.order_id)
+
+            # Only place sell order if we're not at max short inventory
         if self.inventory > -self.max_inventory:
-            orders.append(Order(order_id=self._next_id(), side="sell", price=sell_price, quantity=quantity, order_type=order_type, owner=self))
+                sell_order = Order(
+                    order_id=self._next_id(),
+                    side="sell",
+                    price=sell_price,
+                    quantity=quantity,
+                    order_type=order_type,
+                    owner=self
+                )
+                orders.append(sell_order)
+                self.active_orders.append(sell_order.order_id)
 
         return orders
-
+    
     def updateProfitAndLoss(self, trade_price, trade_quantity, side):
         if side == "buy":
             self.inventory += trade_quantity
