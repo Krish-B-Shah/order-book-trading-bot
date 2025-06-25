@@ -165,13 +165,24 @@ class OrderBook:
             else:
                 break
 
-    def print_book(self):
-        print("Buy Orders:")
-        for order in sorted(self.buy_orders, reverse=True):
-            print(vars(order))
-        print("Sell Orders:")
-        for order in sorted(self.sell_orders):
-            print(vars(order))
+    def print_book(self) -> None:
+            """Print current state of the order book"""
+            print("\n📊 ORDER BOOK:")
+            print("=" * 50)
+            print("BUY ORDERS (sorted by price desc):")
+            if self.buy_orders:
+                for order in sorted(self.buy_orders, key=lambda x: x.price, reverse=True):
+                    print(f"  {order}")
+            else:
+                print("  No buy orders")
+                
+            print("\nSELL ORDERS (sorted by price asc):")
+            if self.sell_orders:
+                for order in sorted(self.sell_orders, key=lambda x: x.price):
+                    print(f"  {order}")
+            else:
+                print("  No sell orders")
+            print("=" * 50)
 
 
     def export_all_orders(self, filename="order_history.csv"):
