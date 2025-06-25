@@ -78,3 +78,18 @@ class MarketMakingStrategy:
         
         print(f"💰 Trade executed: {side.upper()} {trade_quantity} @ ${trade_price:.2f}")
         print(f"📊 Cash: ${self.cash:.2f} | Inventory: {self.inventory} | P&L: ${self.pnl:.2f}")
+    def cancel_all_orders(self) -> None:
+        if not self.order_book:
+            return
+            
+        for order_id in self.active_orders[:]:  # Copy list to avoid modification during iteration
+            if self.order_book.cancel_order(order_id):
+                self.active_orders.remove(order_id)
+
+    def get_status(self) -> Dict[str, Any]:
+        return {
+            "cash": self.cash,
+            "inventory": self.inventory,
+            "pnl": self.pnl,
+            "active_orders": len(self.active_orders)
+        }
