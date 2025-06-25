@@ -68,10 +68,13 @@ class MarketMakingStrategy:
             self.inventory -= trade_quantity
             self.cash += trade_price * trade_quantity
 
-        mid_price = self.order_book.get_last_trade_price() or 100.0
-        self.pNL = self.cash + (self.inventory * mid_price) - 10000
+        # Calculate unrealized P&L based on last trade price
+        last_price = self.order_book.get_last_trade_price() if self.order_book else 100.0
+        if last_price is None:
+            last_price = 100.0
+            
+        unrealized_pnl = self.inventory * last_price
+        self.pnl = (self.cash + unrealized_pnl) - self.starting_cash
         
-        if self.pNL < 0:
-            print(f"⚠️ Warning: Negative P&L of {self.pNL:.2f}")
-        else:
-            print(f"✅ P&L is {self.pNL:.2f}")
+        print(f"💰 Trade executed: {side.upper()} {trade_quantity} @ ${trade_price:.2f}")
+        print(f"📊 Cash: ${self.cash:.2f} | Inventory: {self.inventory} | P&L: ${self.pnl:.2f}")
