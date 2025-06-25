@@ -201,3 +201,33 @@ class OrderBook:
                     "Timestamp": order.timestamp
                 })
         print(f"Order history exported to {filename}")
+
+    def export_orders(self, filename: str = "order_history.csv") -> None:
+        """Export all orders to CSV file"""
+        with open(filename, mode='w', newline='') as csvfile:
+            fieldnames = ["Order_ID", "Side", "Price", "Quantity", "Order_Type", "Owner", "Timestamp"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for order in self.all_orders:
+                writer.writerow({
+                    "Order_ID": order.order_id,
+                    "Side": order.side,
+                    "Price": order.price,
+                    "Quantity": order.quantity,
+                    "Order_Type": order.order_type,
+                    "Owner": order.owner.__class__.__name__ if order.owner else "None",
+                    "Timestamp": order.timestamp
+                })
+        print(f"📄 Order history exported to {filename}")
+
+    def export_trades(self, filename: str = "trade_history.csv") -> None:
+        """Export all trades to CSV file"""
+        with open(filename, mode='w', newline='') as csvfile:
+            fieldnames = ["Price", "Quantity", "Timestamp", "Buyer_ID", "Seller_ID"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for trade in self.trade_log:
+                writer.writerow(trade)
+        print(f"📄 Trade history exported to {filename}")
