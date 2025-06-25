@@ -116,9 +116,9 @@ class OrderBook:
             })
 
             if market_order.owner:
-                market_order.owner.updateProfitAndLoss(trade_price, trade_qty, market_order.side)
+                market_order.owner.updateProfitAndLoss(trade_price, trade_qty, market_order.side, current_price)
             if resting_order.owner:
-                resting_order.owner.updateProfitAndLoss(trade_price, trade_qty, resting_order.side)
+                resting_order.owner.updateProfitAndLoss(trade_price, trade_qty, resting_order.side, current_price)
 
             market_order.quantity -= trade_qty
             resting_order.quantity -= trade_qty
@@ -133,6 +133,7 @@ class OrderBook:
             else:
                 print(f"❌ Market order {market_order.order_id} could not be filled at all.")
 
+  
     def match(self, current_price):
         while self.buy_orders and self.sell_orders:
             best_buy = self.buy_orders[0]

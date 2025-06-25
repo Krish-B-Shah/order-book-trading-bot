@@ -59,8 +59,8 @@ class MarketMakingStrategy:
                 self.active_orders.append(sell_order.order_id)
 
         return orders
-    
-    def updateProfitAndLoss(self, trade_price, trade_quantity, side):
+
+    def updateProfitAndLoss(self, trade_price, trade_quantity, side, current_price):
         if side == "buy":
             self.inventory += trade_quantity
             self.cash -= trade_price * trade_quantity

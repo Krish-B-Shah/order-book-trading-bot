@@ -1,4 +1,5 @@
 from order_book import Order, OrderBook
+import order_book
 from strategy import MarketMakingStrategy
 from matplotlib import pyplot as plt
 from typing import List
@@ -41,13 +42,58 @@ def simulate_market_conditions(base_price):
 
 # book = OrderBook()
 # bot = MarketMakingStrategy(order_book=book)
-
-def create_random_market_order():
+def plot_results(rounds: List[int], pnl_history: List[float], 
+                cash_history: List[float], inventory_history: List[int],
+                trade_log: List[dict]) -> None:
+    """Create comprehensive visualization of trading results"""
+    
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
+    
+    # P&L over time
+    ax1.plot(rounds, pnl_history, marker='o', linewidth=2, markersize=4, color='blue')
+    ax1.set_title("Profit & Loss Over Time", fontsize=14, fontweight='bold')
+    ax1.set_xlabel("Round")
+    ax1.set_ylabel("P&L ($)")
+    ax1.axhline(0, color='red', linestyle='--', alpha=0.7)
+    ax1.grid(True, alpha=0.3)
+    
+    # Cash over time
+    ax2.plot(rounds, cash_history, marker='s', color='green', linewidth=2, markersize=4)
+    ax2.set_title("Cash Position Over Time", fontsize=14, fontweight='bold')
+    ax2.set_xlabel("Round")
+    ax2.set_ylabel("Cash ($)")
+    ax2.grid(True, alpha=0.3)
+    
+    # Inventory over time
+    ax3.plot(rounds, inventory_history, marker='^', color='orange', linewidth=2, markersize=4)
+    ax3.set_title("Inventory Over Time", fontsize=14, fontweight='bold')
+    ax3.set_xlabel("Round")
+    ax3.set_ylabel("Inventory (units)")
+    ax3.axhline(0, color='black', linestyle='--', alpha=0.7)
+    ax3.grid(True, alpha=0.3)
+    
+    # Trade prices over time
+    if trade_log:
+        trade_prices = [trade['price'] for trade in trade_log]
+        trade_rounds = list(range(1, len(trade_prices) + 1))
+        ax4.plot(trade_rounds, trade_prices, marker='d', color='purple', linewidth=2, markersize=4)
+        ax4.set_title("Trade Prices Over Time", fontsize=14, fontweight='bold')
+        ax4.set_xlabel("Trade Number")
+        ax4.set_ylabel("Price ($)")
+        ax4.grid(True, alpha=0.3)
+    else:
+        ax4.text(0.5, 0.5, 'No Trades Executed', ha='center', va='center', transform=ax4.transAxes)
+        ax4.set_title("Trade Prices Over Time", fontsize=14, fontweight='bold')
+    
+    plt.tight_layout()
+    plt.show()
+    
+def create_random_market_order(order_book: OrderBook):
     side = random.choice(["buy", "sell"])
     quantity = random.randint(1, 5)
 
     return Order(
-        order_id=book.next_order_id(),
+        order_id=order_book.next_order_id(),
         side=side,
         price=0,
         quantity=quantity,
@@ -126,9 +172,9 @@ def run_simulation():
             market_order = create_random_market_order(order_book)
             print(f"🌊 Market order: {market_order}")
             order_book.add_order(market_order)
-        
+    
         # Match orders
-        order_book.match_orders()
+        order_book.match(current_price)
         
         # Record metrics
         status = bot.get_status()
