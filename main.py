@@ -27,10 +27,20 @@ def get_initial_price():
         return 100.0
 
 
+def simulate_market_conditions(base_price):
+    # Simulate some market conditions
+    price_change = random.uniform(-2.0, 2.0)
+    current_price = base_price + price_change
+    
+    # Create realistic bid-ask spread
+    spread = random.uniform(0.5, 2.0)
+    bid = current_price - spread / 2
+    ask = current_price + spread / 2
 
+    return current_price, bid, ask  # Simulated mid-price around $100
 
-book = OrderBook()
-bot = MarketMakingStrategy(order_book=book)
+# book = OrderBook()
+# bot = MarketMakingStrategy(order_book=book)
 
 
 rounds  = []
