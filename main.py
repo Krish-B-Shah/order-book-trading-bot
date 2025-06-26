@@ -87,7 +87,7 @@ def plot_results(rounds: List[int], pnl_history: List[float],
     
     plt.tight_layout()
     plt.show()
-    
+
 def create_random_market_order(order_book: OrderBook):
     side = random.choice(["buy", "sell"])
     quantity = random.randint(1, 5)
