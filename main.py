@@ -200,20 +200,20 @@ def generate_synthetic_market_data(base_price: float, num_rounds: int):
     return data
 
 def create_random_market_order(order_book: OrderBook, market_data: dict):
-    """Create realistic market orders based on market data"""
-    side = random.choice(["buy", "sell"])
-    quantity = random.randint(1, 5)
-    
-    # Use realistic pricing - market orders should cross the spread
+    side = random.choices(["buy", "sell"], weights=[0.7, 0.3])[0]  # more buys than sells
+    quantity = random.randint(1, 10)
+
+    # Simulate slippage
+    slip = random.uniform(0, 0.1)
     if side == "buy":
-        price = market_data['ask']  # Buy at ask
+        price = market_data['ask'] + slip
     else:
-        price = market_data['bid']  # Sell at bid
-    
+        price = market_data['bid'] - slip
+
     return Order(
         order_id=order_book.next_order_id(),
         side=side,
-        price=price,
+        price=round(price, 2),
         quantity=quantity,
         order_type="market"
     )
