@@ -75,6 +75,12 @@ class MarketMakingStrategy:
             
         unrealized_pnl = self.inventory * last_price
         self.pnl = (self.cash + unrealized_pnl) - self.starting_cash
+
+        # Inventory penalty: if inventory is too high, penalize P&L
+        if abs(self.inventory) > self.max_inventory * 0.8:
+            penalty = abs(self.inventory) * 0.5  # $0.5 penalty per excess unit
+            self.pnl -= penalty
+            print(f"⚠️ Inventory penalty applied: -${penalty:.2f} (Inventory: {self.inventory})")
         
         print(f"💰 Trade executed: {side.upper()} {trade_quantity} @ ${trade_price:.2f}")
         print(f"📊 Cash: ${self.cash:.2f} | Inventory: {self.inventory} | P&L: ${self.pnl:.2f}")

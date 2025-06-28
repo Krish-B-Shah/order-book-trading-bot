@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from config import API_KEY, SECRET_KEY
 import time
 import pandas as pd
+import heapq
 
 class AlpacaMarketDataProvider:
     """Enhanced market data provider using Alpaca API with fallbacks"""
@@ -52,21 +53,24 @@ class AlpacaMarketDataProvider:
             )
             bars = self.data_client.get_stock_bars(request)
             
-            if bars.df is not None and not bars.df.empty:
-                df = bars.df.reset_index()
-                historical_data = []
-                
-                for _, row in df.iterrows():
-                    historical_data.append({
-                        'timestamp': row['timestamp'],
-                        'open': float(row['open']),
-                        'high': float(row['high']),
-                        'low': float(row['low']),
-                        'close': float(row['close']),
-                        'volume': int(row['volume'])
-                    })
-                
-                return historical_data
+            # Handle the response properly - check if it's a valid response
+            if bars and hasattr(bars, 'df'):
+                df = bars.df
+                if df is not None and not df.empty:
+                    df = df.reset_index()
+                    historical_data = []
+                    
+                    for _, row in df.iterrows():
+                        historical_data.append({
+                            'timestamp': row['timestamp'],
+                            'open': float(row['open']),
+                            'high': float(row['high']),
+                            'low': float(row['low']),
+                            'close': float(row['close']),
+                            'volume': int(row['volume'])
+                        })
+                    
+                    return historical_data
             return None
         except Exception as e:
             print(f"⚠️ Error fetching historical data: {e}")
@@ -133,13 +137,11 @@ def get_market_data_stream(symbol: str, num_rounds: int):
     
     from datetime import datetime, time as dtime
 
-    today = datetime.now().date()
-    start_time = datetime.today().replace(hour=9, minute=30, second=0, microsecond=0)
+    # Use 5-day range for more diverse data instead of same-day
+    start_time = datetime.now() - timedelta(days=5)
     end_time = datetime.now()
 
-
-    
-    print(f"📊 Fetching historical data for {symbol}...")
+    print(f"📊 Fetching historical data for {symbol} from {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}...")
     historical_data = data_provider.get_historical_bars(
         symbol=symbol,
         timeframe=TimeFrame.Minute,
@@ -147,38 +149,66 @@ def get_market_data_stream(symbol: str, num_rounds: int):
         end=end_time
     )
     
-    if historical_data and len(historical_data) >= num_rounds:
-        # Use recent historical data
-        selected_data = historical_data[-num_rounds:]  # Take last N bars
-        print(f"✅ Using {len(selected_data)} historical data points from Alpaca")
-        
-        # Convert to our expected format
-        market_data = []
-        for bar in selected_data:
-            spread = bar['close'] * 0.001  # 0.1% spread
-            market_data.append({
-                'timestamp': bar['timestamp'],
-                'price': bar['close'],
-                'bid': bar['close'] - spread/2,
-                'ask': bar['close'] + spread/2,
-                'volume': bar['volume'],
-                'source': 'alpaca_historical'
-            })
-        return market_data
+    # Validate historical data length
+    if historical_data:
+        print(f"📡 Historical data received: {len(historical_data)} bars")
+        if len(historical_data) >= num_rounds:
+            # Use recent historical data
+            selected_data = historical_data[-num_rounds:]  # Take last N bars
+            print(f"✅ Using {len(selected_data)} historical data points from Alpaca for {symbol}")
+            
+            # Convert to our expected format
+            market_data = []
+            for bar in selected_data:
+                spread = bar['close'] * 0.001  # 0.1% spread
+                market_data.append({
+                    'timestamp': bar['timestamp'],
+                    'price': bar['close'],
+                    'bid': bar['close'] - spread/2,
+                    'ask': bar['close'] + spread/2,
+                    'volume': bar['volume'],
+                    'source': 'alpaca_historical'
+                })
+            print(f"📡 Data used for {symbol} from: {market_data[0]['source']}")
+            return market_data
+        else:
+            print(f"⚠️ Insufficient historical data: {len(historical_data)} bars < {num_rounds} required")
+    else:
+        print(f"⚠️ No historical data available for {symbol}")
     
     # Fallback to synthetic data based on current price
-    print("📊 Generating synthetic market data...")
+    print(f"📊 Generating synthetic market data for {symbol}...")
     initial_data = get_initial_price_and_quote(symbol)
-    return generate_synthetic_market_data(initial_data['price'], num_rounds)
+    synthetic_data = generate_synthetic_market_data(initial_data['price'], num_rounds, symbol)
+    print(f"📡 Data used for {symbol} from: {synthetic_data[0]['source']}")
+    return synthetic_data
 
-def generate_synthetic_market_data(base_price: float, num_rounds: int):
-    """Generate realistic synthetic market data"""
+def generate_synthetic_market_data(base_price: float, num_rounds: int, symbol: str):
+    """Generate realistic synthetic market data with symbol-specific volatility"""
     data = []
     current_price = base_price
     
+    # Symbol-specific volatility mapping for more realistic data
+    vol_map = {
+        'AAPL': 0.002,    # Apple - moderate volatility
+        'TSLA': 0.006,    # Tesla - high volatility
+        'NVDA': 0.005,    # NVIDIA - high volatility
+        'GME': 0.01,      # GameStop - very high volatility
+        'MSFT': 0.002,    # Microsoft - moderate volatility
+        'GOOGL': 0.002,   # Google - moderate volatility
+        'AMZN': 0.003,    # Amazon - moderate-high volatility
+        'META': 0.004,    # Meta - high volatility
+        'NFLX': 0.005,    # Netflix - high volatility
+        'AMD': 0.006      # AMD - high volatility
+    }
+    
+    # Get volatility for symbol, default to 0.002 if not in map
+    volatility = vol_map.get(symbol, 0.002)
+    print(f"📊 Using volatility of {volatility:.3f} for {symbol}")
+    
     for i in range(num_rounds):
-        # Random walk with realistic volatility
-        price_change_pct = random.gauss(0, 0.002)  # 0.2% volatility per round
+        # Random walk with symbol-specific volatility
+        price_change_pct = random.gauss(0, volatility)
         current_price *= (1 + price_change_pct)
         current_price = max(current_price, base_price * 0.5)  # Don't go below 50% of base
         
@@ -200,11 +230,14 @@ def generate_synthetic_market_data(base_price: float, num_rounds: int):
     return data
 
 def create_random_market_order(order_book: OrderBook, market_data: dict):
+    # 10% chance to skip creating a market order (simulates no market interest)
+    if random.random() < 0.1:
+        return None
     side = random.choices(["buy", "sell"], weights=[0.7, 0.3])[0]  # more buys than sells
     quantity = random.randint(1, 10)
 
-    # Simulate slippage
-    slip = random.uniform(0, 0.1)
+    # Simulate more realistic slippage (up to 0.5)
+    slip = random.uniform(0, 0.5)
     if side == "buy":
         price = market_data['ask'] + slip
     else:
@@ -277,11 +310,22 @@ def plot_results(rounds: List[int], pnl_history: List[float],
     plt.show()
 
 def print_simulation_summary(bot: MarketMakingStrategy, order_book: OrderBook, market_data_info: dict) -> None:
-    """Enhanced summary with market data source info"""
+    """Enhanced summary with market data source info and validation"""
     print("\n🏁 SIMULATION COMPLETE!")
     print("=" * 70)
-    print(f"Data Source: {market_data_info.get('primary_source', 'Unknown')}")
     print(f"Symbol: {market_data_info.get('symbol', 'Unknown')}")
+    print(f"Data Source: {market_data_info.get('primary_source', 'Unknown')}")
+    
+    # Display validation information
+    validation = market_data_info.get('validation', {})
+    if validation:
+        print(f"Data Points: {validation.get('num_points', 'Unknown')}")
+        print(f"Price Range: ${validation.get('price_range', 0):.2f}")
+        print(f"Volatility: {validation.get('price_volatility', 0):.3f}")
+        print(f"Price Range: ${validation.get('min_price', 0):.2f} - ${validation.get('max_price', 0):.2f}")
+        if 'warning' in validation:
+            print(f"⚠️ {validation['warning']}")
+    
     print(f"Final P&L: ${bot.pnl:.2f}")
     print(f"Final Cash: ${bot.cash:.2f}")
     print(f"Final Inventory: {bot.inventory}")
@@ -301,6 +345,41 @@ def print_simulation_summary(bot: MarketMakingStrategy, order_book: OrderBook, m
             print(f"  {i}: ${trade['price']:.2f} x {trade['quantity']} @ {timestamp_str}")
         if len(order_book.trade_log) > 5:
             print(f"  ... and {len(order_book.trade_log) - 5} more trades")
+
+def validate_market_data(market_data_stream: List[dict], symbol: str) -> dict:
+    """Validate market data quality and provide insights"""
+    if not market_data_stream:
+        return {'valid': False, 'message': 'No market data available'}
+    
+    data_source = market_data_stream[0]['source']
+    num_points = len(market_data_stream)
+    
+    # Check price range
+    prices = [data['price'] for data in market_data_stream]
+    min_price = min(prices)
+    max_price = max(prices)
+    price_range = max_price - min_price
+    price_volatility = price_range / min_price if min_price > 0 else 0
+    
+    validation_info = {
+        'valid': True,
+        'symbol': symbol,
+        'data_source': data_source,
+        'num_points': num_points,
+        'price_range': price_range,
+        'price_volatility': price_volatility,
+        'min_price': min_price,
+        'max_price': max_price,
+        'message': f"✅ {symbol} data validated: {num_points} points from {data_source}"
+    }
+    
+    # Add warnings for potential issues
+    if data_source == 'synthetic' and price_volatility < 0.01:
+        validation_info['warning'] = f"⚠️ Low volatility detected for {symbol} - may indicate similar patterns"
+    elif num_points < 10:
+        validation_info['warning'] = f"⚠️ Limited data points ({num_points}) for {symbol}"
+    
+    return validation_info
 
 def run_simulation():
     print("🚀 Market Making Trading Bot Simulation with Real Market Data")
@@ -322,6 +401,12 @@ def run_simulation():
 
     # Get market data stream
     market_data_stream = get_market_data_stream(symbol, num_rounds)
+    
+    # Validate market data quality
+    validation_info = validate_market_data(market_data_stream, symbol)
+    print(f"\n📋 {validation_info['message']}")
+    if 'warning' in validation_info:
+        print(f"⚠️ {validation_info['warning']}")
     
     # Initialize trading components
     order_book = OrderBook()
@@ -363,8 +448,9 @@ def run_simulation():
         num_market_orders = random.randint(1, 3)
         for _ in range(num_market_orders):
             market_order = create_random_market_order(order_book, market_data)
-            print(f"🌊 Market order: {market_order}")
-            order_book.add_order(market_order)
+            if market_order:
+                print(f"🌊 Market order: {market_order}")
+                order_book.add_order(market_order)
 
         # Execute matching
         matches_made = order_book.match(current_price)
@@ -389,7 +475,8 @@ def run_simulation():
     # Simulation summary
     market_data_info = {
         'symbol': symbol,
-        'primary_source': market_data_stream[0]['source'] if market_data_stream else 'unknown'
+        'primary_source': market_data_stream[0]['source'] if market_data_stream else 'unknown',
+        'validation': validation_info
     }
     
     print_simulation_summary(bot, order_book, market_data_info)
@@ -405,6 +492,48 @@ def run_simulation():
         order_book.export_orders(f"{symbol}_order_history.csv")
         order_book.export_trades(f"{symbol}_trade_history.csv")
         print("✅ Data exported successfully!")
+
+# --- PATCH OrderBook.match for partial/missed fills ---
+def match_with_realism(self, current_price):
+    while self.buy_orders and self.sell_orders:
+        best_buy = self.buy_orders[0]
+        best_sell = self.sell_orders[0]
+
+        # 10% chance to miss a match entirely
+        if random.random() < 0.1:
+            break
+
+        if best_buy.price >= best_sell.price:
+            trade_qty = min(best_buy.quantity, best_sell.quantity)
+            # 20% chance to only fill part of the order
+            if random.random() < 0.2:
+                trade_qty = max(1, int(trade_qty * random.uniform(0.2, 0.8)))
+            trade_price = best_sell.price
+
+            self.trade_log.append({
+                "price": trade_price,
+                "quantity": trade_qty,
+                "timestamp": time.time()
+            })
+
+            if best_buy.owner:
+                best_buy.owner.updateProfitAndLoss(trade_price, trade_qty, "buy", current_price)
+            if best_sell.owner:
+                best_sell.owner.updateProfitAndLoss(trade_price, trade_qty, "sell", current_price)
+
+            best_buy.quantity -= trade_qty
+            best_sell.quantity -= trade_qty
+
+            if best_buy.quantity == 0:
+                heapq.heappop(self.buy_orders)
+                self.order_map.pop(best_buy.order_id, None)
+            if best_sell.quantity == 0:
+                heapq.heappop(self.sell_orders)
+                self.order_map.pop(best_sell.order_id, None)
+        else:
+            break
+
+OrderBook.match = match_with_realism
 
 if __name__ == "__main__":
     run_simulation()  
