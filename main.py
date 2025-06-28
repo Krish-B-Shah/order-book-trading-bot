@@ -381,7 +381,7 @@ def run_simulation():
         print(f"📈 Status: P&L=${status['pnl']:.2f}, Cash=${status['cash']:.2f}, Inventory={status['inventory']}")
         print("-" * 60)
         
-        time.sleep(1)  # Add a 1-second delay between rounds
+        #time.sleep(1)  # Add a 1-second delay between rounds
 
         # Add small delay for realism (comment out for faster simulation)
         # time.sleep(0.1)
