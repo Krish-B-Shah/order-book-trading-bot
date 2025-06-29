@@ -1,9 +1,10 @@
 from order_book import Order, OrderBook
 from typing import List, Dict, Any, Optional
+import random
 
 class MarketMakingStrategy:
     def __init__(self, starting_cash: float = 10000, order_book: Optional[OrderBook] = None, 
-                 max_inventory: int = 10, spread: float = 2.0):
+                 max_inventory: int = 10, spread: float = 5.0):
         self.starting_cash = starting_cash
         self.cash = starting_cash
         self.inventory = 0
@@ -27,26 +28,50 @@ class MarketMakingStrategy:
         else:
             # For limit orders, place inside the spread
             mid_price = (current_bid + current_ask) / 2
-            half_spread = self.spread / 2
+            market_spread = current_ask - current_bid
+            
+            # Use a percentage of the market spread (more realistic)
+            spread_multiplier = 0.3  # 30% of market spread
+            half_spread = (market_spread * spread_multiplier) / 2
+            
+            # Ensure minimum spread for profitability
+            min_spread = 0.01  # $0.01 minimum
+            half_spread = max(half_spread, min_spread / 2)
+            
             buy_price = mid_price - half_spread
             sell_price = mid_price + half_spread
 
         quantity = 1
 
+        # More conservative inventory management
         if self.inventory < self.max_inventory:
-                buy_order = Order(
-                    order_id=self._next_id(),
-                    side="buy",
-                    price=buy_price,
-                    quantity=quantity,
-                    order_type=order_type,
-                    owner=self
-                )
-                orders.append(buy_order)
-                self.active_orders.append(buy_order.order_id)
+            buy_order = Order(
+                order_id=self._next_id(),
+                side="buy",
+                price=buy_price,
+                quantity=quantity,
+                order_type=order_type,
+                owner=self
+            )
+            orders.append(buy_order)
+            self.active_orders.append(buy_order.order_id)
 
-            # Only place sell order if we're not at max short inventory
-        if self.inventory > -self.max_inventory:
+        # Dynamic sell order placement based on inventory
+        if self.inventory > 0:
+            # If we have positive inventory, always try to sell
+            sell_order = Order(
+                order_id=self._next_id(),
+                side="sell",
+                price=sell_price,
+                quantity=quantity,
+                order_type=order_type,
+                owner=self
+            )
+            orders.append(sell_order)
+            self.active_orders.append(sell_order.order_id)
+        elif self.inventory == 0:
+            # If neutral, place sell order with 70% probability
+            if random.random() < 0.7:
                 sell_order = Order(
                     order_id=self._next_id(),
                     side="sell",
@@ -57,6 +82,7 @@ class MarketMakingStrategy:
                 )
                 orders.append(sell_order)
                 self.active_orders.append(sell_order.order_id)
+        # If negative inventory, don't place sell orders
 
         return orders
 
@@ -78,7 +104,7 @@ class MarketMakingStrategy:
 
         # Inventory penalty: if inventory is too high, penalize P&L
         if abs(self.inventory) > self.max_inventory * 0.8:
-            penalty = abs(self.inventory) * 0.5  # $0.5 penalty per excess unit
+            penalty = abs(self.inventory) * 0.1  # Reduced from $0.5 to $0.1 penalty per excess unit
             self.pnl -= penalty
             print(f"⚠️ Inventory penalty applied: -${penalty:.2f} (Inventory: {self.inventory})")
         
