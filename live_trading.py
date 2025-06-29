@@ -94,7 +94,7 @@ class TradingConfig:
     position_limit_pct: float = 0.8  # % of buying power
     
     # Market making parameters
-    inventory_skew_factor: float = 0.02
+    inventory_skew_factor: float = 0.04  # Increased from 0.02 to 0.04 for better rebalancing
     min_spread_bps: int = 5  # basis points
     max_spread_bps: int = 50
     volatility_adjustment: bool = True
@@ -111,6 +111,25 @@ class TradingConfig:
     # Performance tracking
     performance_window: int = 50
     rebalance_threshold: float = 0.02
+    
+    # Adaptive trading parameters
+    volatility_window: int = 20  # Number of price points for volatility calculation
+    max_volatility_threshold: float = 0.02  # Maximum volatility before widening spreads
+    min_volatility_threshold: float = 0.005  # Minimum volatility for normal spreads
+    
+    # Drawdown protection
+    max_drawdown_dollars: float = 50.0  # Stop trading if P&L < -$50
+    max_drawdown_percent: float = 0.03  # Stop trading if unrealized P&L < -3%
+    auto_throttle_enabled: bool = True
+    
+    # Market condition detection
+    one_sided_move_threshold: float = 0.01  # 1% move in one direction
+    backoff_delay_seconds: float = 5.0  # Delay orders during sharp moves
+    
+    # Performance metrics
+    track_sharpe_ratio: bool = True
+    track_drawdown: bool = True
+    track_win_loss: bool = True
     
     def __post_init__(self):
         """Validate configuration parameters"""
@@ -633,6 +652,17 @@ class InteractiveConfigBuilder:
                     'trail_stop_pct': self.config.trail_stop_pct,
                     'performance_window': self.config.performance_window,
                     'rebalance_threshold': self.config.rebalance_threshold,
+                    'volatility_window': self.config.volatility_window,
+                    'max_volatility_threshold': self.config.max_volatility_threshold,
+                    'min_volatility_threshold': self.config.min_volatility_threshold,
+                    'max_drawdown_dollars': self.config.max_drawdown_dollars,
+                    'max_drawdown_percent': self.config.max_drawdown_percent,
+                    'auto_throttle_enabled': self.config.auto_throttle_enabled,
+                    'one_sided_move_threshold': self.config.one_sided_move_threshold,
+                    'backoff_delay_seconds': self.config.backoff_delay_seconds,
+                    'track_sharpe_ratio': self.config.track_sharpe_ratio,
+                    'track_drawdown': self.config.track_drawdown,
+                    'track_win_loss': self.config.track_win_loss,
                     'created_at': datetime.now().isoformat()
                 }
                 
@@ -844,6 +874,21 @@ class EnhancedMarketMaker:
         self.simulated_orders = {}  # Track simulated orders
         self.simulated_order_id = 1000  # Start with high ID to avoid conflicts
         
+        # Adaptive trading tracking
+        self.price_history = []  # Track mid-prices for volatility calculation
+        self.volatility = 0.0  # Current market volatility
+        self.last_mid_price = None  # Previous mid-price for trend detection
+        self.trend_direction = 0  # -1 for down, 0 for neutral, 1 for up
+        self.consecutive_moves = 0  # Count consecutive moves in same direction
+        self.backoff_until = None  # Timestamp until which to back off trading
+        
+        # Performance tracking
+        self.trade_history = []  # Track all trades for performance metrics
+        self.peak_equity = 100000.0  # Track peak equity for drawdown calculation
+        self.current_drawdown = 0.0  # Current drawdown percentage
+        self.winning_trades = 0
+        self.losing_trades = 0
+        
         # Initialize market data simulator if in simulation mode
         if self.config.simulation_mode:
             self.market_simulator = MarketDataSimulator(
@@ -1013,7 +1058,8 @@ class EnhancedMarketMaker:
         order['filled_price'] = fill_price
         order['filled_qty'] = qty
         
-        # Update position and cash
+        # Calculate trade P&L
+        trade_pnl = 0.0
         if side == "buy":
             self.simulated_position += qty
             self.simulated_cash -= fill_price * qty
@@ -1026,9 +1072,16 @@ class EnhancedMarketMaker:
         # Calculate P&L
         current_price = self.market_simulator.current_price if self.market_simulator else fill_price
         unrealized_pnl = self.simulated_position * current_price
+        old_total_pnl = self.total_pnl
         self.total_pnl = (self.simulated_cash + unrealized_pnl) - 100000.0
         
-        print(f"📊 Position: {self.simulated_position} shares | Cash: ${self.simulated_cash:.2f} | P&L: ${self.total_pnl:.2f}")
+        # Calculate trade P&L (difference in total P&L)
+        trade_pnl = self.total_pnl - old_total_pnl
+        
+        # Update performance metrics
+        self.update_performance_metrics(trade_pnl)
+        
+        print(f"📊 Position: {self.simulated_position} shares | Cash: ${self.simulated_cash:.2f} | P&L: ${self.total_pnl:.2f} | Trade P&L: ${trade_pnl:.2f}")
     
     def get_position(self):
         """Get current position details"""
@@ -1052,23 +1105,195 @@ class EnhancedMarketMaker:
             except Exception:
                 return 0, 0, 0, 0
     
+    def calculate_volatility(self, current_mid_price):
+        """Calculate market volatility based on price history"""
+        self.price_history.append(current_mid_price)
+        
+        # Keep only the last N price points
+        if len(self.price_history) > self.config.volatility_window:
+            self.price_history.pop(0)
+        
+        # Calculate volatility (standard deviation of returns)
+        if len(self.price_history) >= 2:
+            returns = []
+            for i in range(1, len(self.price_history)):
+                if self.price_history[i-1] != 0:
+                    return_val = (self.price_history[i] - self.price_history[i-1]) / self.price_history[i-1]
+                    returns.append(return_val)
+            
+            if returns:
+                import statistics
+                self.volatility = statistics.stdev(returns)
+            else:
+                self.volatility = 0.0
+        else:
+            self.volatility = 0.0
+        
+        return self.volatility
+    
+    def detect_market_conditions(self, current_mid_price):
+        """Detect market conditions and adjust trading behavior"""
+        if self.last_mid_price is None:
+            self.last_mid_price = current_mid_price
+            return
+        
+        # Calculate price change
+        price_change = (current_mid_price - self.last_mid_price) / self.last_mid_price
+        price_change_threshold = self.config.one_sided_move_threshold
+        
+        # Detect trend direction
+        if abs(price_change) > price_change_threshold:
+            new_direction = 1 if price_change > 0 else -1
+            
+            if new_direction == self.trend_direction:
+                self.consecutive_moves += 1
+            else:
+                self.consecutive_moves = 1
+                self.trend_direction = new_direction
+            
+            # Back off if too many consecutive moves in same direction
+            if self.consecutive_moves >= 3:
+                self.backoff_until = datetime.now().timestamp() + self.config.backoff_delay_seconds
+                print(f"⚠️ Sharp one-sided move detected! Backing off for {self.config.backoff_delay_seconds} seconds")
+        else:
+            # Reset if price change is small
+            self.consecutive_moves = 0
+            self.trend_direction = 0
+        
+        self.last_mid_price = current_mid_price
+    
+    def should_throttle_trading(self):
+        """Check if trading should be throttled due to drawdown or backoff"""
+        # Check backoff period
+        if self.backoff_until and datetime.now().timestamp() < self.backoff_until:
+            remaining = self.backoff_until - datetime.now().timestamp()
+            print(f"⏸️ Trading throttled due to backoff period ({remaining:.1f}s remaining)")
+            return True
+        
+        # Check drawdown protection
+        if self.config.auto_throttle_enabled:
+            # Calculate current equity
+            current_price = self.market_simulator.current_price if self.market_simulator else 150.0
+            unrealized_pnl = self.simulated_position * current_price
+            current_equity = self.simulated_cash + unrealized_pnl
+            
+            # Update peak equity
+            if current_equity > self.peak_equity:
+                self.peak_equity = current_equity
+            
+            # Calculate drawdown
+            if self.peak_equity > 0:
+                self.current_drawdown = (self.peak_equity - current_equity) / self.peak_equity
+            
+            # Check dollar drawdown
+            if self.total_pnl < -self.config.max_drawdown_dollars:
+                print(f"🛑 Trading stopped: P&L below threshold (${self.total_pnl:.2f} < -${self.config.max_drawdown_dollars})")
+                return True
+            
+            # Check percentage drawdown
+            if self.current_drawdown > self.config.max_drawdown_percent:
+                print(f"🛑 Trading stopped: Drawdown above threshold ({self.current_drawdown:.2%} > {self.config.max_drawdown_percent:.2%})")
+                return True
+        
+        return False
+    
+    def calculate_adaptive_spread(self, base_spread, volatility):
+        """Calculate adaptive spread based on market volatility"""
+        if volatility > self.config.max_volatility_threshold:
+            # High volatility - widen spreads significantly
+            spread_multiplier = 2.0 + (volatility / self.config.max_volatility_threshold)
+            print(f"📈 High volatility detected ({volatility:.4f}) - widening spreads by {spread_multiplier:.1f}x")
+        elif volatility > self.config.min_volatility_threshold:
+            # Moderate volatility - widen spreads moderately
+            spread_multiplier = 1.0 + (volatility / self.config.max_volatility_threshold)
+            print(f"📊 Moderate volatility ({volatility:.4f}) - widening spreads by {spread_multiplier:.1f}x")
+        else:
+            # Low volatility - use normal spreads
+            spread_multiplier = 1.0
+        
+        return base_spread * spread_multiplier
+    
+    def update_performance_metrics(self, trade_pnl):
+        """Update performance tracking metrics"""
+        self.trade_history.append({
+            'timestamp': datetime.now(),
+            'pnl': trade_pnl,
+            'position': self.simulated_position,
+            'equity': self.simulated_cash + (self.simulated_position * (self.market_simulator.current_price if self.market_simulator else 150.0))
+        })
+        
+        # Update win/loss counts
+        if trade_pnl > 0:
+            self.winning_trades += 1
+        elif trade_pnl < 0:
+            self.losing_trades += 1
+        
+        # Keep only recent history for performance calculation
+        if len(self.trade_history) > self.config.performance_window:
+            self.trade_history.pop(0)
+    
+    def calculate_sharpe_ratio(self):
+        """Calculate Sharpe ratio of recent trades"""
+        if len(self.trade_history) < 2:
+            return 0.0
+        
+        returns = []
+        for i in range(1, len(self.trade_history)):
+            prev_equity = self.trade_history[i-1]['equity']
+            curr_equity = self.trade_history[i]['equity']
+            if prev_equity > 0:
+                ret = (curr_equity - prev_equity) / prev_equity
+                returns.append(ret)
+        
+        if len(returns) < 2:
+            return 0.0
+        
+        import statistics
+        avg_return = statistics.mean(returns)
+        std_return = statistics.stdev(returns)
+        
+        if std_return > 0:
+            return avg_return / std_return
+        return 0.0
+    
+    def print_performance_summary(self):
+        """Print comprehensive performance summary"""
+        total_trades = self.winning_trades + self.losing_trades
+        win_rate = (self.winning_trades / total_trades * 100) if total_trades > 0 else 0
+        
+        sharpe_ratio = self.calculate_sharpe_ratio()
+        
+        print(f"\n📊 PERFORMANCE SUMMARY")
+        print(f"=" * 50)
+        print(f"💰 Total P&L: ${self.total_pnl:.2f}")
+        print(f"📈 Current Drawdown: {self.current_drawdown:.2%}")
+        print(f"🎯 Win Rate: {win_rate:.1f}% ({self.winning_trades}/{total_trades})")
+        print(f"📊 Sharpe Ratio: {sharpe_ratio:.3f}")
+        print(f"📈 Volatility: {self.volatility:.4f}")
+        print(f"📋 Position: {self.simulated_position} shares")
+        print(f"💵 Cash: ${self.simulated_cash:.2f}")
+        print(f"=" * 50)
+    
     def calculate_optimal_prices(self, bid, ask):
-        """Calculate optimal buy/sell prices for market making"""
+        """Calculate optimal buy/sell prices for market making with adaptive spreads"""
         spread = ask - bid
         mid_price = (bid + ask) / 2
         
-        # Use dynamic spread calculation based on market spread (like in strategy.py)
+        # Calculate base spread using dynamic calculation
         spread_multiplier = 0.3  # 30% of market spread
-        half_spread = (spread * spread_multiplier) / 2
+        base_half_spread = (spread * spread_multiplier) / 2
+        
+        # Apply adaptive spread based on volatility
+        adaptive_half_spread = self.calculate_adaptive_spread(base_half_spread, self.volatility) / 2
         
         # Ensure minimum spread for profitability
         min_spread = 0.01  # $0.01 minimum
-        if half_spread < min_spread / 2:
-            half_spread = min_spread / 2
+        if adaptive_half_spread < min_spread / 2:
+            adaptive_half_spread = min_spread / 2
         
         # Calculate buy and sell prices
-        buy_price = mid_price - half_spread
-        sell_price = mid_price + half_spread
+        buy_price = mid_price - adaptive_half_spread
+        sell_price = mid_price + adaptive_half_spread
         
         # Ensure we have some profit margin
         if sell_price <= buy_price:
@@ -1130,9 +1355,9 @@ class EnhancedMarketMaker:
         return True
     
     def run(self):
-        """Main market making loop"""
-        print(f"✅ Running market making bot for {self.config.symbol}")
-        print(f"📊 Strategy: Place competitive orders near bid/ask with {self.config.base_spread} spread")
+        """Main market making loop with adaptive features"""
+        print(f"✅ Running adaptive market making bot for {self.config.symbol}")
+        print(f"📊 Strategy: Adaptive spreads based on volatility and market conditions")
         
         for i in range(self.config.max_rounds):
             print(f"\n🔁 Round {i+1}/{self.config.max_rounds}")
@@ -1143,7 +1368,20 @@ class EnhancedMarketMaker:
                 print("⚠️ Skipping round due to missing quote.")
                 continue
             
-            print(f"📈 Market: Bid=${bid:.2f}, Ask=${ask:.2f}, Spread=${ask-bid:.2f}")
+            mid_price = (bid + ask) / 2
+            print(f"📈 Market: Bid=${bid:.2f}, Ask=${ask:.2f}, Mid=${mid_price:.2f}, Spread=${ask-bid:.2f}")
+            
+            # Calculate volatility and detect market conditions
+            volatility = self.calculate_volatility(mid_price)
+            self.detect_market_conditions(mid_price)
+            
+            print(f"📊 Volatility: {volatility:.4f} | Trend: {self.trend_direction} | Consecutive moves: {self.consecutive_moves}")
+            
+            # Check if trading should be throttled
+            if self.should_throttle_trading():
+                print("⏸️ Trading throttled - waiting for conditions to improve...")
+                time.sleep(self.config.sleep_interval)
+                continue
             
             # Cancel stale orders
             self.cancel_stale_orders()
@@ -1154,7 +1392,7 @@ class EnhancedMarketMaker:
             # Get current position
             qty, avg_entry, market_price, unrealized = self.get_position()
             
-            # Calculate optimal prices
+            # Calculate optimal prices with adaptive spreads
             buy_price, sell_price = self.calculate_optimal_prices(bid, ask)
             print(f"💰 Our prices: Buy=${buy_price:.2f}, Sell=${sell_price:.2f}, Spread=${sell_price-buy_price:.2f}")
             
@@ -1182,10 +1420,15 @@ class EnhancedMarketMaker:
             print(f"📊 Position: {qty} shares @ avg ${avg_entry:.2f} | Market: ${market_price:.2f} | Unrealized P&L: ${unrealized:.2f}")
             print(f"📋 Open orders: {len(self.open_orders)}")
             
+            # Print performance summary every 10 rounds
+            if i % 10 == 0 and i > 0:
+                self.print_performance_summary()
+            
             # Sleep between rounds
-            import time
             time.sleep(self.config.sleep_interval)
         
+        # Final performance summary
+        self.print_performance_summary()
         print(f"\n🎯 Trading session complete!")
         print(f"📊 Final position: {qty} shares")
         print(f"💰 Final unrealized P&L: ${unrealized:.2f}")

@@ -536,4 +536,10 @@ def match_with_realism(self, current_price):
 OrderBook.match = match_with_realism
 
 if __name__ == "__main__":
-    run_simulation()  
+    while True:
+        run_simulation()
+        cont = input("\n🔄 Run another simulation? (y/n): ").lower().strip()
+        if cont != 'y':
+            print("Thanks for using the Market Making Bot! Goodbye!")
+            break
+    print("Exiting...")
