@@ -413,8 +413,8 @@ def run_simulation():
     bot = MarketMakingStrategy(
         starting_cash=10000,
         order_book=order_book,
-        max_inventory=5,  # Reduced for better risk management
-        spread=0.5  # 50% of market spread
+        max_inventory=20,  # Increased for more active trading
+        spread=0.10  # Tighter spread for more realistic market making
     )
 
     # Tracking arrays
@@ -445,7 +445,7 @@ def run_simulation():
             print(f"🤖 Bot placed: {order}")
 
         # Simulate market activity with realistic orders
-        num_market_orders = random.randint(0, 1)  # Reduced from 1-3 to 0-1
+        num_market_orders = random.randint(1, 3)
         for _ in range(num_market_orders):
             market_order = create_random_market_order(order_book, market_data)
             if market_order:

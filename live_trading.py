@@ -6,9 +6,6 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 import re
-import random
-import math
-import time
 
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest
@@ -82,11 +79,8 @@ class TradingConfig:
     max_rounds: int = 100
     base_spread: float = 0.10
     position_size: int = 1
-    max_position: int = 5  # Reduced from 20 to 5 for better risk management
+    max_position: int = 20
     sleep_interval: float = 2.0
-    
-    # Simulation mode
-    simulation_mode: bool = True  # Use simulated market data instead of live data
     
     # Risk management
     max_daily_loss: float = 1000.0
@@ -100,7 +94,7 @@ class TradingConfig:
     volatility_adjustment: bool = True
     
     # Order management
-    max_open_orders_per_side: int = 2  # Reduced from 3 to 2 for better control
+    max_open_orders_per_side: int = 3
     order_timeout_seconds: int = 300
     
     # Exit strategies
@@ -147,7 +141,6 @@ class InteractiveConfigBuilder:
         self.config = TradingConfig()
         self.data_client = None
         self.trading_client = None
-        self.account_info = None  # Initialize account_info attribute
         self._initialize_clients()
     
     def _initialize_clients(self):
@@ -286,15 +279,6 @@ class InteractiveConfigBuilder:
             daytrade_buying_power = getattr(account, 'daytrade_buying_power', None)
             pattern_day_trader = getattr(account, 'pattern_day_trader', None)
             
-            # Store account info for later use
-            self.account_info = {
-                'portfolio_value': float(portfolio_value) if portfolio_value else None,
-                'cash': float(cash) if cash else None,
-                'buying_power': float(buying_power) if buying_power else None,
-                'daytrade_buying_power': float(daytrade_buying_power) if daytrade_buying_power else None,
-                'pattern_day_trader': pattern_day_trader
-            }
-            
             if portfolio_value is not None:
                 print(f"   💰 Portfolio Value: ${float(portfolio_value):,.2f}")
             if cash is not None:
@@ -327,69 +311,77 @@ class InteractiveConfigBuilder:
     
     def configure_basic_settings(self):
         """Configure basic trading settings"""
-        print("\n📋 BASIC SETTINGS")
-        print("-" * 50)
+        print("\n" + "="*50)
+        print("📈 BASIC TRADING SETTINGS")
+        print("="*50)
         
-        # Symbol
+        # Stock Symbol
         self.config.symbol = self.get_user_input(
-            "Stock symbol to trade",
-            default="AAPL",
+            "�� Which stock symbol do you want to trade?",
+            default=self.config.symbol,
             validation_func=self.validate_symbol,
-            help_text="Enter a valid stock symbol (1-5 letters, e.g., AAPL, MSFT, GOOGL)"
+            help_text="Enter a valid US stock symbol (e.g., AAPL, TSLA, SPY). "
+                     "The bot will make markets in this stock by placing buy and sell orders."
         )
         
-        # Trading duration
+        # Trading Duration
         self.config.max_rounds = self.get_user_input(
-            "Number of trading rounds",
-            default=50,  # Reduced from 100 to 50 for faster testing
+            "⏰ How many trading rounds? (Each round places new orders)",
+            default=self.config.max_rounds,
             validation_func=self.validate_positive_int,
-            help_text="How many trading cycles to run (1-1000)"
+            help_text="Number of trading cycles. Each round the bot will evaluate market "
+                     "conditions and place new orders. More rounds = longer running time."
         )
         
-        # Sleep interval
+        # Sleep Interval
         self.config.sleep_interval = self.get_user_input(
-            "Seconds between rounds",
-            default=3.0,  # Increased from 2.0 to 3.0 for more realistic pacing
+            "⏱️ Seconds between trading rounds?",
+            default=self.config.sleep_interval,
             validation_func=self.validate_positive_float,
-            help_text="Time to wait between trading rounds (0.5-60 seconds)"
+            help_text="How long to wait between each trading round. Shorter intervals = "
+                     "more active trading but higher API usage. Recommended: 2-10 seconds."
         )
-        
-        # Simulation mode
-        simulation_input = self.get_user_input(
-            "Use simulation mode? (y/n)",
-            default="y",
-            validation_func=self.validate_boolean,
-            help_text="Simulation mode uses fake market data for testing (y/n)"
-        )
-        self.config.simulation_mode = simulation_input
     
     def configure_position_settings(self):
-        """Configure position and order size settings"""
-        print("\n📊 POSITION SETTINGS")
-        print("-" * 50)
+        """Configure position and order settings"""
+        print("\n" + "="*50)
+        print("📊 POSITION & ORDER SETTINGS")
+        print("="*50)
         
-        # Position size
+        # Position Size
         self.config.position_size = self.get_user_input(
-            "Shares per order",
-            default=1,  # Keep at 1 for conservative trading
+            "📏 How many shares per order?",
+            default=self.config.position_size,
             validation_func=self.validate_positive_int,
-            help_text="Number of shares to buy/sell per order (1-100)"
+            help_text="Number of shares in each buy/sell order. Start small while testing. "
+                     "This affects your capital requirements and risk per trade."
         )
         
-        # Max position
+        # Max Position
         self.config.max_position = self.get_user_input(
-            "Maximum position size",
-            default=5,  # Reduced from 20 to 5 for better risk management
+            "🏗️ Maximum total position (long or short)?",
+            default=self.config.max_position,
             validation_func=self.validate_positive_int,
-            help_text="Maximum shares to hold (long or short) at any time"
+            help_text="Maximum number of shares you can hold long or short. This limits "
+                     "your total exposure. Should be multiple of position_size."
         )
         
-        # Max open orders per side
+        # Max orders per side
         self.config.max_open_orders_per_side = self.get_user_input(
-            "Maximum open orders per side",
-            default=2,  # Reduced from 3 to 2 for better control
+            "📋 Maximum open orders per side (buy/sell)?",
+            default=self.config.max_open_orders_per_side,
             validation_func=self.validate_positive_int,
-            help_text="Maximum buy OR sell orders to have open at once"
+            help_text="Maximum number of pending buy orders and sell orders. More orders "
+                     "= more opportunities but also more complexity to manage."
+        )
+        
+        # Order timeout
+        self.config.order_timeout_seconds = self.get_user_input(
+            "⏰ Order timeout in seconds?",
+            default=self.config.order_timeout_seconds,
+            validation_func=self.validate_positive_int,
+            help_text="How long to keep orders open before cancelling them. Longer timeout "
+                     "= higher chance of fills but stale pricing. Recommended: 300-600 seconds."
         )
     
     def configure_spread_settings(self):
@@ -567,53 +559,38 @@ class InteractiveConfigBuilder:
         self.config.rebalance_threshold = rebalance_threshold_pct
     
     def show_configuration_summary(self):
-        """Display final configuration summary"""
+        """Show complete configuration summary"""
         print("\n" + "="*70)
-        print("📊 CONFIGURATION SUMMARY")
+        print("📋 CONFIGURATION SUMMARY")
         print("="*70)
         
-        # Basic settings
-        print(f"📋 Symbol: {self.config.symbol}")
-        print(f"🎮 Mode: {'SIMULATION' if self.config.simulation_mode else 'LIVE'}")
-        print(f"⏰ Trading Rounds: {self.config.max_rounds}")
-        print(f"⏱️ Interval: {self.config.sleep_interval} seconds")
+        print(f"📈 Basic Settings:")
+        print(f"   Symbol: {self.config.symbol}")
+        print(f"   Max Rounds: {self.config.max_rounds}")
+        print(f"   Sleep Interval: {self.config.sleep_interval} seconds")
         
-        # Position settings
-        print(f"\n📈 Position Settings:")
-        print(f"   • Position Size: {self.config.position_size} shares")
-        print(f"   • Max Position: {self.config.max_position} shares")
-        print(f"   • Max Orders per Side: {self.config.max_open_orders_per_side}")
+        print(f"\n📊 Position Settings:")
+        print(f"   Position Size: {self.config.position_size} shares")
+        print(f"   Max Position: {self.config.max_position} shares")
+        print(f"   Max Orders/Side: {self.config.max_open_orders_per_side}")
+        print(f"   Order Timeout: {self.config.order_timeout_seconds} seconds")
         
-        # Spread settings
         print(f"\n💰 Spread Settings:")
-        print(f"   • Base Spread: ${self.config.base_spread:.2f}")
-        print(f"   • Min Spread: {self.config.min_spread_bps} bps")
-        print(f"   • Max Spread: {self.config.max_spread_bps} bps")
-        print(f"   • Inventory Skew: {self.config.inventory_skew_factor:.3f}")
+        print(f"   Base Spread: ${self.config.base_spread:.2f}")
+        print(f"   Min Spread: {self.config.min_spread_bps} bp")
+        print(f"   Max Spread: {self.config.max_spread_bps} bp")
+        print(f"   Volatility Adjustment: {self.config.volatility_adjustment}")
+        print(f"   Inventory Skew Factor: {self.config.inventory_skew_factor}")
         
-        # Risk management
         print(f"\n🛡️ Risk Management:")
-        print(f"   • Max Daily Loss: ${self.config.max_daily_loss:.2f}")
-        print(f"   • Max Drawdown: {self.config.max_drawdown_pct:.1%}")
-        print(f"   • Position Limit: {self.config.position_limit_pct:.1%}")
+        print(f"   Max Daily Loss: ${self.config.max_daily_loss:.2f}")
+        print(f"   Max Drawdown: {self.config.max_drawdown_pct:.1%}")
+        print(f"   Position Limit: {self.config.position_limit_pct:.1%}")
         
-        # Exit strategies
         print(f"\n🎯 Exit Strategies:")
-        print(f"   • Take Profit: {self.config.take_profit_pct:.1%}")
-        print(f"   • Stop Loss: {self.config.stop_loss_pct:.1%}")
-        print(f"   • Trail Stop: {self.config.trail_stop_pct:.1%}")
-        
-        # Performance tracking
-        print(f"\n📊 Performance Tracking:")
-        print(f"   • Performance Window: {self.config.performance_window} rounds")
-        print(f"   • Rebalance Threshold: {self.config.rebalance_threshold:.1%}")
-        
-        # Account info if available
-        if hasattr(self, 'account_info') and self.account_info:
-            print(f"\n💳 Account Information:")
-            print(f"   • Buying Power: ${self.account_info.get('buying_power', 'N/A')}")
-            print(f"   • Cash: ${self.account_info.get('cash', 'N/A')}")
-            print(f"   • Portfolio Value: ${self.account_info.get('portfolio_value', 'N/A')}")
+        print(f"   Take Profit: {self.config.take_profit_pct:.1%}")
+        print(f"   Stop Loss: {self.config.stop_loss_pct:.1%}")
+        print(f"   Trailing Stop: {self.config.trail_stop_pct:.1%}")
         
         print("="*70)
     
@@ -734,129 +711,6 @@ class InteractiveConfigBuilder:
             print(f"❌ Configuration error: {e}")
             return None
 
-# Market Data Simulator for Real-time Testing
-class MarketDataSimulator:
-    """Simulates realistic market data for testing"""
-    
-    def __init__(self, symbol: str = "AAPL", base_price: float = 150.0, volatility: float = 0.015):  # Reduced volatility from 0.02 to 0.015
-        self.symbol = symbol
-        self.base_price = base_price
-        self.current_price = base_price
-        self.volatility = volatility
-        self.time_step = 0
-        self.trend = 0.0
-        self.market_status = "open"
-        
-        # More realistic spread parameters
-        self.min_spread = 0.01  # $0.01 minimum spread
-        self.max_spread = 0.05  # $0.05 maximum spread
-        self.spread_volatility = 0.002  # Spread volatility
-        
-        # Market hours simulation
-        self.market_open = True
-        self.volume_factor = 1.0
-        
-        # Market microstructure parameters
-        self.base_volume = 1000
-        self.volume_volatility = 0.3
-        
-        # Market hours simulation (9:30 AM - 4:00 PM EST)
-        self.market_open = 9.5  # 9:30 AM
-        self.market_close = 16.0  # 4:00 PM
-        
-    def _generate_price_movement(self):
-        """Generate realistic price movement using random walk with trend"""
-        # Random walk component
-        random_component = random.gauss(0, self.volatility)
-        
-        # Trend component (slow drift)
-        self.trend += random.gauss(0, 0.001)
-        self.trend = max(-0.01, min(0.01, self.trend))  # Limit trend
-        
-        # Noise component
-        noise = random.gauss(0, self.spread_volatility)
-        
-        # Combine all components
-        price_change = random_component + self.trend + noise
-        
-        # Apply price change
-        self.current_price *= (1 + price_change)
-        
-        # Ensure price stays reasonable
-        self.current_price = max(1.0, min(1000.0, self.current_price))
-        
-        return self.current_price
-    
-    def _generate_spread(self):
-        """Generate realistic bid-ask spread"""
-        # Base spread as percentage of price
-        base_spread_pct = random.uniform(0.0001, 0.002)  # 0.01% to 0.2%
-        base_spread = self.current_price * base_spread_pct
-        
-        # Add volatility to spread
-        spread_noise = random.gauss(0, self.spread_volatility)
-        spread = base_spread + spread_noise
-        
-        # Ensure spread is within bounds
-        spread = max(self.min_spread, min(self.max_spread, spread))
-        
-        return spread
-    
-    def _simulate_market_hours_effect(self):
-        """Simulate market hours effects (higher volatility at open/close)"""
-        current_hour = (self.time_step % 24) + 9.5  # Start at 9:30 AM
-        
-        # Higher volatility at market open and close
-        if current_hour < 10.5 or current_hour > 15.0:
-            return 1.5  # 50% higher volatility
-        elif current_hour < 11.0 or current_hour > 14.5:
-            return 1.2  # 20% higher volatility
-        else:
-            return 1.0  # Normal volatility
-    
-    def get_latest_quote(self):
-        """Get simulated bid/ask quote"""
-        # Update price
-        price = self._generate_price_movement()
-        
-        # Generate spread
-        spread = self._generate_spread()
-        
-        # Apply market hours effect
-        hours_multiplier = self._simulate_market_hours_effect()
-        spread *= hours_multiplier
-        
-        # Calculate bid and ask
-        mid_price = price
-        bid = mid_price - (spread / 2)
-        ask = mid_price + (spread / 2)
-        
-        # Ensure bid and ask are positive
-        bid = max(0.01, bid)
-        ask = max(bid + 0.01, ask)
-        
-        # Update time step
-        self.time_step += 1
-        
-        return round(bid, 2), round(ask, 2)
-    
-    def get_market_status(self):
-        """Get current market status information"""
-        current_hour = (self.time_step % 24) + 9.5
-        
-        if 9.5 <= current_hour <= 16.0:
-            status = "OPEN"
-        else:
-            status = "CLOSED"
-            
-        return {
-            "symbol": self.symbol,
-            "current_price": round(self.current_price, 2),
-            "market_status": status,
-            "time_step": self.time_step,
-            "trend": round(self.trend, 4)
-        }
-
 @dataclass
 class EnhancedMarketMaker:
     def __init__(self, config):
@@ -868,90 +722,36 @@ class EnhancedMarketMaker:
         self.total_pnl = 0.0
         self.trades_count = 0
         
-        # Simulation mode tracking
-        self.simulated_position = 0  # Track position in simulation mode
-        self.simulated_cash = 100000.0  # Starting cash for simulation
-        self.simulated_orders = {}  # Track simulated orders
-        self.simulated_order_id = 1000  # Start with high ID to avoid conflicts
-        
-        # Adaptive trading tracking
-        self.price_history = []  # Track mid-prices for volatility calculation
-        self.volatility = 0.0  # Current market volatility
-        self.last_mid_price = None  # Previous mid-price for trend detection
-        self.trend_direction = 0  # -1 for down, 0 for neutral, 1 for up
-        self.consecutive_moves = 0  # Count consecutive moves in same direction
-        self.backoff_until = None  # Timestamp until which to back off trading
-        
-        # Performance tracking
-        self.trade_history = []  # Track all trades for performance metrics
-        self.peak_equity = 100000.0  # Track peak equity for drawdown calculation
-        self.current_drawdown = 0.0  # Current drawdown percentage
-        self.winning_trades = 0
-        self.losing_trades = 0
-        
-        # Initialize market data simulator if in simulation mode
-        if self.config.simulation_mode:
-            self.market_simulator = MarketDataSimulator(
-                symbol=self.config.symbol,
-                base_price=150.0,  # You can adjust this
-                volatility=0.015
-            )
-            print(f"🎮 SIMULATION MODE: Using simulated market data for {self.config.symbol}")
-            print(f"💰 Starting with ${self.simulated_cash:,.2f} cash and 0 shares")
-        else:
-            self.market_simulator = None
-            print(f"📡 LIVE MODE: Using real Alpaca market data for {self.config.symbol}")
-        
     def get_latest_quote(self):
-        """Get latest bid/ask quote - either simulated or live"""
-        if self.config.simulation_mode and self.market_simulator:
-            # Use simulated market data
-            bid, ask = self.market_simulator.get_latest_quote()
-            market_status = self.market_simulator.get_market_status()
-            
-            # Print market status every 10 steps
-            if market_status["time_step"] % 10 == 0:
-                print(f"🎮 Simulated Market: {market_status['market_status']} | "
-                      f"Price: ${market_status['current_price']:.2f} | "
-                      f"Trend: {market_status['trend']:+.4f}")
-            
-            return bid, ask
-        else:
-            # Use live Alpaca data
-            try:
-                request = StockLatestQuoteRequest(symbol_or_symbols=[self.config.symbol])
-                quotes = self.data_client.get_stock_latest_quote(request)
-                quote = quotes[self.config.symbol]
-                return float(quote.bid_price), float(quote.ask_price)
-            except Exception as e:
-                print(f"❌ Error fetching latest quote: {e}")
-                return None, None
+        """Get latest bid/ask quote"""
+        try:
+            request = StockLatestQuoteRequest(symbol_or_symbols=[self.config.symbol])
+            quotes = self.data_client.get_stock_latest_quote(request)
+            quote = quotes[self.config.symbol]
+            return float(quote.bid_price), float(quote.ask_price)
+        except Exception as e:
+            print(f"❌ Error fetching latest quote: {e}")
+            return None, None
     
     def get_open_orders(self):
         """Get all open orders for the symbol"""
-        if self.config.simulation_mode:
-            # Return simulated open orders
-            return {order_id: order for order_id, order in self.simulated_orders.items() 
-                   if order['status'] == 'open'}
-        else:
-            # Use real Alpaca orders
-            try:
-                orders = self.trading_client.get_orders()
-                # Filter for our symbol and open status
-                open_orders = {}
-                for order in orders:
-                    order_symbol = getattr(order, 'symbol', '')
-                    order_status = getattr(order, 'status', '').lower()
-                    order_id = getattr(order, 'id', None)
-                    
-                    if (order_symbol == self.config.symbol and 
-                        order_status == 'open' and 
-                        order_id is not None):
-                        open_orders[order_id] = order
-                return open_orders
-            except Exception as e:
-                print(f"❌ Error getting open orders: {e}")
-                return {}
+        try:
+            orders = self.trading_client.get_orders()
+            # Filter for our symbol and open status
+            open_orders = {}
+            for order in orders:
+                order_symbol = getattr(order, 'symbol', '')
+                order_status = getattr(order, 'status', '').lower()
+                order_id = getattr(order, 'id', None)
+                
+                if (order_symbol == self.config.symbol and 
+                    order_status == 'open' and 
+                    order_id is not None):
+                    open_orders[order_id] = order
+            return open_orders
+        except Exception as e:
+            print(f"❌ Error getting open orders: {e}")
+            return {}
     
     def cancel_stale_orders(self):
         """Cancel orders that are older than timeout"""
@@ -963,147 +763,52 @@ class EnhancedMarketMaker:
                 orders_to_cancel.append(order_id)
         
         for order_id in orders_to_cancel:
-            if self.config.simulation_mode:
-                # Cancel simulated order
-                if order_id in self.simulated_orders:
-                    self.simulated_orders[order_id]['status'] = 'cancelled'
-                    print(f"🛑 Cancelled simulated order {order_id}")
-                    if order_id in self.order_timestamps:
-                        del self.order_timestamps[order_id]
-            else:
-                # Cancel real Alpaca order
-                try:
-                    self.trading_client.cancel_order_by_id(order_id)
-                    print(f"🛑 Cancelled stale order {order_id}")
-                    if order_id in self.open_orders:
-                        del self.open_orders[order_id]
-                    if order_id in self.order_timestamps:
-                        del self.order_timestamps[order_id]
-                except Exception as e:
-                    print(f"❌ Error cancelling stale order {order_id}: {e}")
+            try:
+                self.trading_client.cancel_order_by_id(order_id)
+                print(f"🛑 Cancelled stale order {order_id}")
+                if order_id in self.open_orders:
+                    del self.open_orders[order_id]
+                if order_id in self.order_timestamps:
+                    del self.order_timestamps[order_id]
+            except Exception as e:
+                print(f"❌ Error cancelling stale order {order_id}: {e}")
     
     def place_limit_order(self, side, price, qty):
         """Place a limit order and track it"""
-        if self.config.simulation_mode:
-            # Simulate order placement
-            order_id = self.simulated_order_id
-            self.simulated_order_id += 1
+        try:
+            order_data = LimitOrderRequest(
+                symbol=self.config.symbol,
+                qty=qty,
+                side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
+                limit_price=round(price, 2),
+                time_in_force=TimeInForce.DAY
+            )
+            order = self.trading_client.submit_order(order_data)
+            order_id = getattr(order, 'id', None)
             
-            # Create simulated order
-            order = {
-                'id': order_id,
-                'symbol': self.config.symbol,
-                'side': side,
-                'price': price,
-                'qty': qty,
-                'status': 'open',
-                'order_type': 'limit'
-            }
-            
-            self.simulated_orders[order_id] = order
-            self.order_timestamps[order_id] = datetime.now()
-            
-            print(f"✅ Placed simulated {side} limit order for {qty} at ${price:.2f} (id={order_id})")
-            
-            # Simulate immediate fill for marketable orders
-            current_bid, current_ask = self.get_latest_quote()
-            if current_bid and current_ask:
-                if side == "buy" and price >= current_ask:  # Marketable buy order
-                    self._simulate_order_fill(order_id, current_ask, qty, side)
-                elif side == "sell" and price <= current_bid:  # Marketable sell order
-                    self._simulate_order_fill(order_id, current_bid, qty, side)
-                else:
-                    # For non-marketable orders, simulate some fills based on probability
-                    if random.random() < 0.15:  # Reduced from 30% to 15% chance of fill for non-marketable orders
-                        if side == "buy":
-                            fill_price = min(price, current_ask)
-                            self._simulate_order_fill(order_id, fill_price, qty, side)
-                        else:  # sell
-                            fill_price = max(price, current_bid)
-                            self._simulate_order_fill(order_id, fill_price, qty, side)
-            
-            return order_id
-        else:
-            # Place real Alpaca order
-            try:
-                order_data = MarketOrderRequest(
-                    symbol=self.config.symbol,
-                    qty=qty,
-                    side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
-                    limit_price=round(price, 2),
-                    time_in_force=TimeInForce.DAY
-                )
-                order = self.trading_client.submit_order(order_data)
-                order_id = getattr(order, 'id', None)
-                
-                if order_id:
-                    self.open_orders[order_id] = order
-                    self.order_timestamps[order_id] = datetime.now()
-                    print(f"✅ Placed {side} limit order for {qty} at ${price:.2f} (id={order_id})")
-                    return order_id
-                else:
-                    print(f"✅ Placed {side} limit order for {qty} at ${price:.2f} (order: {order})")
-                    return None
-            except Exception as e:
-                print(f"❌ Error placing {side} limit order: {e}")
+            if order_id:
+                self.open_orders[order_id] = order
+                self.order_timestamps[order_id] = datetime.now()
+                print(f"✅ Placed {side} limit order for {qty} at ${price:.2f} (id={order_id})")
+                return order_id
+            else:
+                print(f"✅ Placed {side} limit order for {qty} at ${price:.2f} (order: {order})")
                 return None
-    
-    def _simulate_order_fill(self, order_id, fill_price, qty, side):
-        """Simulate order fill and update position/cash"""
-        if order_id not in self.simulated_orders:
-            return
-        
-        order = self.simulated_orders[order_id]
-        order['status'] = 'filled'
-        order['filled_price'] = fill_price
-        order['filled_qty'] = qty
-        
-        # Calculate trade P&L
-        trade_pnl = 0.0
-        if side == "buy":
-            self.simulated_position += qty
-            self.simulated_cash -= fill_price * qty
-            print(f"💰 Simulated BUY fill: {qty} shares @ ${fill_price:.2f}")
-        else:  # sell
-            self.simulated_position -= qty
-            self.simulated_cash += fill_price * qty
-            print(f"💰 Simulated SELL fill: {qty} shares @ ${fill_price:.2f}")
-        
-        # Calculate P&L
-        current_price = self.market_simulator.current_price if self.market_simulator else fill_price
-        unrealized_pnl = self.simulated_position * current_price
-        old_total_pnl = self.total_pnl
-        self.total_pnl = (self.simulated_cash + unrealized_pnl) - 100000.0
-        
-        # Calculate trade P&L (difference in total P&L)
-        trade_pnl = self.total_pnl - old_total_pnl
-        
-        # Update performance metrics
-        self.update_performance_metrics(trade_pnl)
-        
-        print(f"📊 Position: {self.simulated_position} shares | Cash: ${self.simulated_cash:.2f} | P&L: ${self.total_pnl:.2f} | Trade P&L: ${trade_pnl:.2f}")
+        except Exception as e:
+            print(f"❌ Error placing {side} limit order: {e}")
+            return None
     
     def get_position(self):
         """Get current position details"""
-        if self.config.simulation_mode:
-            # Return simulated position
-            current_price = self.market_simulator.current_price if self.market_simulator else 150.0
-            unrealized_pnl = self.simulated_position * current_price
-            total_value = self.simulated_cash + unrealized_pnl
-            avg_entry = 150.0  # Simplified for simulation
-            
-            return self.simulated_position, avg_entry, current_price, unrealized_pnl
-        else:
-            # Get real Alpaca position
-            try:
-                pos = self.trading_client.get_open_position(self.config.symbol)
-                qty = float(getattr(pos, 'qty', 0) or 0)
-                avg_entry = float(getattr(pos, 'avg_entry_price', 0) or 0)
-                market_price = float(getattr(pos, 'current_price', 0) or 0)
-                unrealized = float(getattr(pos, 'unrealized_pl', 0) or 0)
-                return qty, avg_entry, market_price, unrealized
-            except Exception:
-                return 0, 0, 0, 0
+        try:
+            pos = self.trading_client.get_open_position(self.config.symbol)
+            qty = float(getattr(pos, 'qty', 0) or 0)
+            avg_entry = float(getattr(pos, 'avg_entry_price', 0) or 0)
+            market_price = float(getattr(pos, 'current_price', 0) or 0)
+            unrealized = float(getattr(pos, 'unrealized_pl', 0) or 0)
+            return qty, avg_entry, market_price, unrealized
+        except Exception:
+            return 0, 0, 0, 0
     
     def calculate_volatility(self, current_mid_price):
         """Calculate market volatility based on price history"""
@@ -1279,21 +984,11 @@ class EnhancedMarketMaker:
         spread = ask - bid
         mid_price = (bid + ask) / 2
         
-        # Calculate base spread using dynamic calculation
-        spread_multiplier = 0.3  # 30% of market spread
-        base_half_spread = (spread * spread_multiplier) / 2
-        
-        # Apply adaptive spread based on volatility
-        adaptive_half_spread = self.calculate_adaptive_spread(base_half_spread, self.volatility) / 2
-        
-        # Ensure minimum spread for profitability
-        min_spread = 0.01  # $0.01 minimum
-        if adaptive_half_spread < min_spread / 2:
-            adaptive_half_spread = min_spread / 2
-        
-        # Calculate buy and sell prices
-        buy_price = mid_price - adaptive_half_spread
-        sell_price = mid_price + adaptive_half_spread
+        # For testing and getting fills, be more aggressive
+        # Place buy orders at ask (marketable) to guarantee fills
+        # Place sell orders at bid (marketable) to guarantee fills
+        buy_price = ask  # Marketable limit order - will fill immediately
+        sell_price = bid  # Marketable limit order - will fill immediately
         
         # Ensure we have some profit margin
         if sell_price <= buy_price:
@@ -1311,12 +1006,8 @@ class EnhancedMarketMaker:
             return False
         
         # Count existing buy orders
-        if self.config.simulation_mode:
-            buy_orders = sum(1 for order in self.simulated_orders.values() 
-                           if order['status'] == 'open' and order['side'] == 'buy')
-        else:
-            buy_orders = sum(1 for order in self.open_orders.values() 
-                           if getattr(order, 'side', None) == OrderSide.BUY)
+        buy_orders = sum(1 for order in self.open_orders.values() 
+                        if getattr(order, 'side', None) == OrderSide.BUY)
         
         # Don't place more buy orders than limit
         if buy_orders >= self.config.max_open_orders_per_side:
@@ -1333,18 +1024,9 @@ class EnhancedMarketMaker:
             print(f"🔍 Debug: No shares to sell (qty={current_qty})")
             return False
         
-        # More conservative sell order placement for negative inventory
-        if current_qty < 0 and random.random() > 0.3:  # 30% chance to sell when short
-            print(f"🔍 Debug: Skipping sell order due to negative inventory (qty={current_qty})")
-            return False
-        
         # Count existing sell orders
-        if self.config.simulation_mode:
-            sell_orders = sum(1 for order in self.simulated_orders.values() 
-                            if order['status'] == 'open' and order['side'] == 'sell')
-        else:
-            sell_orders = sum(1 for order in self.open_orders.values() 
-                            if getattr(order, 'side', None) == OrderSide.SELL)
+        sell_orders = sum(1 for order in self.open_orders.values() 
+                         if getattr(order, 'side', None) == OrderSide.SELL)
         
         # Don't place more sell orders than limit
         if sell_orders >= self.config.max_open_orders_per_side:

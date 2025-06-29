@@ -42,9 +42,7 @@ class OrderBook:
     def add_order(self, order):
         if order.order_type == "market":
             self.execute_market_order(order, current_price=self.get_last_trade_price() or 100.0)
-            # Only store market orders if they have remaining quantity
-            if order.quantity > 0:
-                self.all_orders.append(order)
+            self.all_orders.append(order)
             return
 
         if order.order_id in self.order_map:
@@ -227,14 +225,10 @@ class OrderBook:
     def export_trades(self, filename: str = "trade_history.csv") -> None:
         """Export all trades to CSV file"""
         with open(filename, mode='w', newline='') as csvfile:
-            fieldnames = ["Price", "Quantity", "Timestamp"]
+            fieldnames = ["Price", "Quantity", "Timestamp", "Buyer_ID", "Seller_ID"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             
             for trade in self.trade_log:
-                writer.writerow({
-                    "Price": trade["price"],
-                    "Quantity": trade["quantity"], 
-                    "Timestamp": trade["timestamp"]
-                })
+                writer.writerow(trade)
         print(f"📄 Trade history exported to {filename}")
