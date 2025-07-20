@@ -1,5 +1,4 @@
 from order_book import Order, OrderBook
-import order_book
 from strategy import MarketMakingStrategy
 from matplotlib import pyplot as plt
 from typing import List
@@ -15,17 +14,15 @@ import pandas as pd
 import heapq
 
 class AlpacaMarketDataProvider:
-    """Enhanced market data provider using Alpaca API with fallbacks"""
-    
-    def __init__(self, api_key: str, secret_key: str):
+    # Importting the market data from alpaca that is used to get the current quote and historical bars. 
+    def __init__(self, api_key, secret_key):
         self.data_client = StockHistoricalDataClient(api_key, secret_key)
         self.api_key = api_key
         self.secret_key = secret_key
         
-    def get_current_quote(self, symbol: str):
-        """Get current bid/ask quote for a symbol"""
+    def get_current_quote(self, symbol): # This function is used to get the current quote of the stock. Or in the easy terms the bid and ask price of the stock.
         try:
-            request = StockLatestQuoteRequest(symbol_or_symbols=[symbol])
+            request = StockLatestQuoteRequest(symbol_or_symbols=[symbol]) # Requesting the current quote of the stock.
             quotes = self.data_client.get_stock_latest_quote(request)
             
             if symbol in quotes:
@@ -42,8 +39,7 @@ class AlpacaMarketDataProvider:
             print(f"⚠️ Error fetching current quote: {e}")
             return None
     
-    def get_historical_bars(self, symbol: str, timeframe: TimeFrame, start: datetime, end: datetime):
-        """Get historical bar data"""
+    def get_historical_bars(self, symbol, timeframe, start, end): # This function is used to get the historical bars of the stock.
         try:
             request = StockBarsRequest(
                 symbol_or_symbols=[symbol],
@@ -76,21 +72,18 @@ class AlpacaMarketDataProvider:
             print(f"⚠️ Error fetching historical data: {e}")
             return None
 
-def get_initial_price_and_quote(symbol: str = "AAPL"):
-    """Get initial price using multiple data sources with fallbacks"""
-    data_provider = AlpacaMarketDataProvider(API_KEY, SECRET_KEY)
+def get_initial_price_and_quote(symbol = "AAPL"):  # This function is used to calculate the initial price and quote of the stock.
+    data_provider = AlpacaMarketDataProvider(API_KEY, SECRET_KEY) # Getting the data provider of the stock.  
+    print(f"📡 Fetching real-time data for {symbol}...") # Printing the symbol that is being fetched.
+    quote = data_provider.get_current_quote(symbol) # Getting the current quote of the stock.
     
-    # Try Alpaca first for real-time quote
-    print(f"📡 Fetching real-time data for {symbol}...")
-    quote = data_provider.get_current_quote(symbol)
-    
-    if quote:
+    if quote: # If the quote is not None then it will print the quote.
         mid_price = (quote['bid'] + quote['ask']) / 2
-        print(f"📈 Using live {symbol} data from Alpaca:")
-        print(f"   Bid: ${quote['bid']:.2f} (Size: {quote['bid_size']})")
-        print(f"   Ask: ${quote['ask']:.2f} (Size: {quote['ask_size']})")
-        print(f"   Mid: ${mid_price:.2f}")
-        print(f"   Timestamp: {quote['timestamp']}")
+        print(f"📈 Using live {symbol} data from Alpaca:") # Printing the symbol that is being fetched.
+        print(f"   Bid: ${quote['bid']:.2f} (Size: {quote['bid_size']})") # Printing the bid price of the stock.
+        print(f"   Ask: ${quote['ask']:.2f} (Size: {quote['ask_size']})") # Printing the ask price of the stock.
+        print(f"   Mid: ${mid_price:.2f}") # Printing the mid price of the stock.
+        print(f"   Timestamp: {quote['timestamp']}") # Printing the timestamp of the quote.
         return {
             'price': mid_price,
             'bid': quote['bid'],
@@ -98,17 +91,16 @@ def get_initial_price_and_quote(symbol: str = "AAPL"):
             'source': 'alpaca'
         }
     
-    # Fallback to yfinance
     try:
-        print(f"📡 Falling back to yfinance for {symbol}...")
-        ticker = yf.Ticker(symbol)
-        price_data = ticker.history(period="1d", interval="1m")
+        print(f"📡 Falling back to yfinance for {symbol}...") # Printing the symbol that is being fetched.
+        ticker = yf.Ticker(symbol) # Getting the ticker of the stock.
+        price_data = ticker.history(period="1d", interval="1m") # Getting the price data of the stock.
         
-        if not price_data.empty:
-            latest_price = float(price_data["Close"].iloc[-1])
+        if not price_data.empty: # If the price data is not empty then it will print the price data.
+            latest_price = float(price_data["Close"].iloc[-1]) # Getting the latest price of the stock.
             spread = latest_price * 0.001  # 0.1% spread
-            bid = latest_price - spread/2
-            ask = latest_price + spread/2
+            bid = latest_price - spread/2 # Getting the bid price of the stock.
+            ask = latest_price + spread/2 # Getting the ask price of the stock.
             
             print(f"📈 Using yfinance {symbol} price: ${latest_price:.2f}")
             return {
@@ -131,15 +123,12 @@ def get_initial_price_and_quote(symbol: str = "AAPL"):
         'source': 'default'
     }
 
-def get_market_data_stream(symbol: str, num_rounds: int):
-    """Get streaming market data for simulation"""
-    data_provider = AlpacaMarketDataProvider(API_KEY, SECRET_KEY)
-    
-    from datetime import datetime, time as dtime
-
-    # Use 5-day range for more diverse data instead of same-day
-    start_time = datetime.now() - timedelta(days=5)
-    end_time = datetime.now()
+def get_market_data_stream(symbol, num_rounds): # This function is used to get the market data stream of the stock. 
+    data_provider = AlpacaMarketDataProvider(API_KEY, SECRET_KEY) # Getting the data provider of the stock.
+    user_start_time = input("Enter the start time of the stock (YYYY-MM-DD HH:MM): or press enter to use default (5 days ago)") # Getting the start time of the stock from the user.
+    user_end_time = input("Enter the end time of the stock (YYYY-MM-DD HH:MM): or press enter to use default (now)") # Getting the end time of the stock from the user.
+    start_time = datetime.now() - timedelta(days=5) if not user_start_time else datetime.strptime(user_start_time, "%Y-%m-%d %H:%M") # Getting the start time of the stock.
+    end_time = datetime.now() if not user_end_time else datetime.strptime(user_end_time, "%Y-%m-%d %H:%M") # Getting the end time of the stock.
 
     print(f"📊 Fetching historical data for {symbol} from {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}...")
     historical_data = data_provider.get_historical_bars(
