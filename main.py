@@ -36,7 +36,7 @@ class AlpacaMarketDataProvider:
                 }
             return None
         except Exception as e:
-            print(f"⚠️ Error fetching current quote: {e}")
+            print(f"Error fetching current quote: {e}")
             return None
     
     def get_historical_bars(self, symbol, timeframe, start, end): # This function is used to get the historical bars of the stock.
@@ -69,17 +69,17 @@ class AlpacaMarketDataProvider:
                     return historical_data
             return None
         except Exception as e:
-            print(f"⚠️ Error fetching historical data: {e}")
+            print(f"Error fetching historical data: {e}")
             return None
 
 def get_initial_price_and_quote(symbol = "AAPL"):  # This function is used to calculate the initial price and quote of the stock.
     data_provider = AlpacaMarketDataProvider(API_KEY, SECRET_KEY) # Getting the data provider of the stock.  
-    print(f"📡 Fetching real-time data for {symbol}...") # Printing the symbol that is being fetched.
+    print(f"Fetching real-time data for {symbol}...") # Printing the symbol that is being fetched.
     quote = data_provider.get_current_quote(symbol) # Getting the current quote of the stock.
     
     if quote: # If the quote is not None then it will print the quote.
         mid_price = (quote['bid'] + quote['ask']) / 2
-        print(f"📈 Using live {symbol} data from Alpaca:") # Printing the symbol that is being fetched.
+        print(f"Using live {symbol} data from Alpaca:") # Printing the symbol that is being fetched.
         print(f"   Bid: ${quote['bid']:.2f} (Size: {quote['bid_size']})") # Printing the bid price of the stock.
         print(f"   Ask: ${quote['ask']:.2f} (Size: {quote['ask_size']})") # Printing the ask price of the stock.
         print(f"   Mid: ${mid_price:.2f}") # Printing the mid price of the stock.
@@ -92,7 +92,7 @@ def get_initial_price_and_quote(symbol = "AAPL"):  # This function is used to ca
         }
     
     try:
-        print(f"📡 Falling back to yfinance for {symbol}...") # Printing the symbol that is being fetched.
+        print(f"Falling back to yfinance for {symbol}...") # Printing the symbol that is being fetched.
         ticker = yf.Ticker(symbol) # Getting the ticker of the stock.
         price_data = ticker.history(period="1d", interval="1m") # Getting the price data of the stock.
         
@@ -102,7 +102,7 @@ def get_initial_price_and_quote(symbol = "AAPL"):  # This function is used to ca
             bid = latest_price - spread/2 # Getting the bid price of the stock.
             ask = latest_price + spread/2 # Getting the ask price of the stock.
             
-            print(f"📈 Using yfinance {symbol} price: ${latest_price:.2f}")
+            print(f"Using yfinance {symbol} price: ${latest_price:.2f}")
             return {
                 'price': latest_price,
                 'bid': bid,
@@ -110,10 +110,10 @@ def get_initial_price_and_quote(symbol = "AAPL"):  # This function is used to ca
                 'source': 'yfinance'
             }
     except Exception as e:
-        print(f"⚠️ yfinance error: {e}")
+        print(f"yfinance error: {e}")
     
     # Final fallback to default
-    print(f"⚠️ All data sources failed, using default price")
+    print(f"All data sources failed, using default price")
     default_price = 150.0 if symbol == "AAPL" else 100.0
     spread = default_price * 0.002
     return {
@@ -130,7 +130,7 @@ def get_market_data_stream(symbol, num_rounds): # This function is used to get t
     start_time = datetime.now() - timedelta(days=5) if not user_start_time else datetime.strptime(user_start_time, "%Y-%m-%d %H:%M") # Getting the start time of the stock.
     end_time = datetime.now() if not user_end_time else datetime.strptime(user_end_time, "%Y-%m-%d %H:%M") # Getting the end time of the stock.
 
-    print(f"📊 Fetching historical data for {symbol} from {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}...")
+    print(f"Fetching historical data for {symbol} from {start_time.strftime('%Y-%m-%d %H:%M')} to {end_time.strftime('%Y-%m-%d %H:%M')}...")
     historical_data = data_provider.get_historical_bars(
         symbol=symbol,
         timeframe=TimeFrame.Minute,
@@ -140,11 +140,11 @@ def get_market_data_stream(symbol, num_rounds): # This function is used to get t
     
     # Validate historical data length
     if historical_data:
-        print(f"📡 Historical data received: {len(historical_data)} bars")
+        print(f"Historical data received: {len(historical_data)} bars")
         if len(historical_data) >= num_rounds:
             # Use recent historical data
             selected_data = historical_data[-num_rounds:]  # Take last N bars
-            print(f"✅ Using {len(selected_data)} historical data points from Alpaca for {symbol}")
+            print(f"Using {len(selected_data)} historical data points from Alpaca for {symbol}")
             
             # Convert to our expected format
             market_data = []
@@ -158,20 +158,22 @@ def get_market_data_stream(symbol, num_rounds): # This function is used to get t
                     'volume': bar['volume'],
                     'source': 'alpaca_historical'
                 })
-            print(f"📡 Data used for {symbol} from: {market_data[0]['source']}")
+            print(f"Data used for {symbol} from: {market_data[0]['source']}")
             return market_data
         else:
-            print(f"⚠️ Insufficient historical data: {len(historical_data)} bars < {num_rounds} required")
+            print(f"Insufficient historical data: {len(historical_data)} bars < {num_rounds} required")
     else:
-        print(f"⚠️ No historical data available for {symbol}")
+        print(f"No historical data available for {symbol}")
     
     # Fallback to synthetic data based on current price
-    print(f"📊 Generating synthetic market data for {symbol}...")
+    print(f"Generating synthetic market data for {symbol}...")
     initial_data = get_initial_price_and_quote(symbol)
     synthetic_data = generate_synthetic_market_data(initial_data['price'], num_rounds, symbol)
-    print(f"📡 Data used for {symbol} from: {synthetic_data[0]['source']}")
+    print(f"Data used for {symbol} from: {synthetic_data[0]['source']}")
     return synthetic_data
 
+
+# Used when the market data is not available from the alpaca api.
 def generate_synthetic_market_data(base_price: float, num_rounds: int, symbol: str):
     """Generate realistic synthetic market data with symbol-specific volatility"""
     data = []
@@ -188,12 +190,163 @@ def generate_synthetic_market_data(base_price: float, num_rounds: int, symbol: s
         'AMZN': 0.003,    # Amazon - moderate-high volatility
         'META': 0.004,    # Meta - high volatility
         'NFLX': 0.005,    # Netflix - high volatility
-        'AMD': 0.006      # AMD - high volatility
+        'AMD': 0.006,     # AMD - high volatility
+        'SPY': 0.001,     # S&P 500 ETF - low volatility
+        'QQQ': 0.002,     # NASDAQ ETF - moderate volatility
+        'IWM': 0.003,     # Russell 2000 ETF - moderate-high volatility
+        'VTI': 0.001,     # Total Market ETF - low volatility
+        'VOO': 0.001,     # S&P 500 ETF - low volatility
+        'ARKK': 0.008,    # ARK Innovation ETF - very high volatility
+        'PLTR': 0.007,    # Palantir - very high volatility
+        'COIN': 0.009,    # Coinbase - very high volatility
+        'RBLX': 0.006,    # Roblox - high volatility
+        'SNOW': 0.005,    # Snowflake - high volatility
+        'CRWD': 0.006,    # CrowdStrike - high volatility
+        'ZM': 0.004,      # Zoom - moderate-high volatility
+        'SHOP': 0.007,    # Shopify - very high volatility
+        'SQ': 0.008,      # Square - very high volatility
+        'UBER': 0.005,    # Uber - high volatility
+        'LYFT': 0.006,    # Lyft - high volatility
+        'DASH': 0.007,    # DoorDash - very high volatility
+        'ABNB': 0.006,    # Airbnb - high volatility
+        'SPOT': 0.005,    # Spotify - high volatility
+        'PINS': 0.006,    # Pinterest - high volatility
+        'SNAP': 0.008,    # Snapchat - very high volatility
+        'TWTR': 0.005,    # Twitter - high volatility
+        'DIS': 0.003,     # Disney - moderate-high volatility
+        'NFLX': 0.005,    # Netflix - high volatility
+        'CMCSA': 0.002,   # Comcast - moderate volatility
+        'VZ': 0.002,      # Verizon - moderate volatility
+        'T': 0.002,       # AT&T - moderate volatility
+        'JPM': 0.002,     # JPMorgan Chase - moderate volatility
+        'BAC': 0.003,     # Bank of America - moderate-high volatility
+        'WFC': 0.003,     # Wells Fargo - moderate-high volatility
+        'GS': 0.003,      # Goldman Sachs - moderate-high volatility
+        'JNJ': 0.002,     # Johnson & Johnson - moderate volatility
+        'PFE': 0.003,     # Pfizer - moderate-high volatility
+        'UNH': 0.002,     # UnitedHealth - moderate volatility
+        'HD': 0.002,      # Home Depot - moderate volatility
+        'LOW': 0.002,     # Lowe's - moderate volatility
+        'COST': 0.002,    # Costco - moderate volatility
+        'WMT': 0.002,     # Walmart - moderate volatility
+        'TGT': 0.003,     # Target - moderate-high volatility
+        'CVS': 0.003,     # CVS Health - moderate-high volatility
+        'UNP': 0.002,     # Union Pacific - moderate volatility
+        'CAT': 0.003,     # Caterpillar - moderate-high volatility
+        'DE': 0.003,      # Deere - moderate-high volatility
+        'XOM': 0.003,     # Exxon Mobil - moderate-high volatility
+        'CVX': 0.003,     # Chevron - moderate-high volatility
+        'KO': 0.002,      # Coca-Cola - moderate volatility
+        'PEP': 0.002,     # PepsiCo - moderate volatility
+        'PG': 0.002,      # Procter & Gamble - moderate volatility
+        'CL': 0.002,      # Colgate-Palmolive - moderate volatility
+        'KMB': 0.002,     # Kimberly-Clark - moderate volatility
+        'GIS': 0.002,     # General Mills - moderate volatility
+        'K': 0.002,       # Kellogg - moderate volatility
+        'HSY': 0.002,     # Hershey - moderate volatility
+        'MCD': 0.002,     # McDonald's - moderate volatility
+        'SBUX': 0.003,    # Starbucks - moderate-high volatility
+        'YUM': 0.003,     # Yum! Brands - moderate-high volatility
+        'CMG': 0.004,     # Chipotle - high volatility
+        'NKE': 0.003,     # Nike - moderate-high volatility
+        'UA': 0.004,      # Under Armour - high volatility
+        'LULU': 0.005,    # Lululemon - high volatility
+        'ROKU': 0.008,    # Roku - very high volatility
+        'TTD': 0.007,     # Trade Desk - very high volatility
+        'MELI': 0.006,    # MercadoLibre - high volatility
+        'SE': 0.008,      # Sea Limited - very high volatility
+        'BABA': 0.005,    # Alibaba - high volatility
+        'JD': 0.005,      # JD.com - high volatility
+        'PDD': 0.007,     # Pinduoduo - very high volatility
+        'TCEHY': 0.004,   # Tencent - moderate-high volatility
+        'NIO': 0.008,     # NIO - very high volatility
+        'XPEV': 0.008,    # XPeng - very high volatility
+        'LI': 0.007,      # Li Auto - very high volatility
+        'BIDU': 0.005,    # Baidu - high volatility
+        'TME': 0.006,     # Tencent Music - high volatility
+        'NTES': 0.004,    # NetEase - moderate-high volatility
+        'BILI': 0.007,    # Bilibili - very high volatility
+        'DOGE': 0.015,    # Dogecoin - extremely high volatility
+        'BTC': 0.012,     # Bitcoin - extremely high volatility
+        'ETH': 0.013,     # Ethereum - extremely high volatility
+        'ADA': 0.014,     # Cardano - extremely high volatility
+        'SOL': 0.016,     # Solana - extremely high volatility
+        'DOT': 0.015,     # Polkadot - extremely high volatility
+        'LINK': 0.014,    # Chainlink - extremely high volatility
+        'UNI': 0.015,     # Uniswap - extremely high volatility
+        'MATIC': 0.016,   # Polygon - extremely high volatility
+        'AVAX': 0.017,    # Avalanche - extremely high volatility
+        'ATOM': 0.014,    # Cosmos - extremely high volatility
+        'FTT': 0.018,     # FTX Token - extremely high volatility
+        'LUNA': 0.019,    # Terra - extremely high volatility
+        'SHIB': 0.020,    # Shiba Inu - extremely high volatility
+        'XRP': 0.013,     # Ripple - extremely high volatility
+        'LTC': 0.012,     # Litecoin - extremely high volatility
+        'BCH': 0.013,     # Bitcoin Cash - extremely high volatility
+        'XLM': 0.014,     # Stellar - extremely high volatility
+        'VET': 0.015,     # VeChain - extremely high volatility
+        'TRX': 0.014,     # TRON - extremely high volatility
+        'EOS': 0.013,     # EOS - extremely high volatility
+        'AAVE': 0.016,    # Aave - extremely high volatility
+        'COMP': 0.015,    # Compound - extremely high volatility
+        'MKR': 0.014,     # Maker - extremely high volatility
+        'YFI': 0.017,     # Yearn Finance - extremely high volatility
+        'SUSHI': 0.018,   # SushiSwap - extremely high volatility
+        'CRV': 0.016,     # Curve - extremely high volatility
+        '1INCH': 0.017,   # 1inch - extremely high volatility
+        'ALPHA': 0.018,   # Alpha Finance - extremely high volatility
+        'PERP': 0.019,    # Perpetual Protocol - extremely high volatility
+        'RUNE': 0.015,    # THORChain - extremely high volatility
+        'KSM': 0.014,     # Kusama - extremely high volatility
+        'DYDX': 0.016,    # dYdX - extremely high volatility
+        'IMX': 0.017,     # Immutable X - extremely high volatility
+        'OP': 0.015,      # Optimism - extremely high volatility
+        'ARB': 0.016,     # Arbitrum - extremely high volatility
+        'ZKS': 0.017,     # zkSync - extremely high volatility
+        'STRK': 0.018,    # Starknet - extremely high volatility
+        'SUI': 0.019,     # Sui - extremely high volatility
+        'APT': 0.016,     # Aptos - extremely high volatility
+        'SEI': 0.017,     # Sei - extremely high volatility
+        'INJ': 0.018,     # Injective - extremely high volatility
+        'TIA': 0.019,     # Celestia - extremely high volatility
+        'JUP': 0.020,     # Jupiter - extremely high volatility
+        'WIF': 0.021,     # dogwifhat - extremely high volatility
+        'BONK': 0.022,    # Bonk - extremely high volatility
+        'PEPE': 0.023,    # Pepe - extremely high volatility
+        'FLOKI': 0.024,   # Floki - extremely high volatility
+        'DOGE': 0.015,    # Dogecoin - extremely high volatility
+        'SHIB': 0.020,    # Shiba Inu - extremely high volatility
+        'BABYDOGE': 0.025, # Baby Doge - extremely high volatility
+        'SAFEMOON': 0.026, # SafeMoon - extremely high volatility
+        'ELON': 0.027,    # Dogelon Mars - extremely high volatility
+        'HOKK': 0.028,    # Hokkaidu Inu - extremely high volatility
+        'KISHU': 0.029,   # Kishu Inu - extremely high volatility
+        'SAMO': 0.030,    # Samoyedcoin - extremely high volatility
+        'CORGI': 0.031,   # Corgi Inu - extremely high volatility
+        'SHIBX': 0.032,   # Shiba X - extremely high volatility
+        'DOGEKING': 0.033, # Doge King - extremely high volatility
+        'MOONDOGE': 0.034, # Moon Doge - extremely high volatility
+        'SPACEDOGE': 0.035, # Space Doge - extremely high volatility
+        'GALAXYDOGE': 0.036, # Galaxy Doge - extremely high volatility
+        'COSMICDOGE': 0.037, # Cosmic Doge - extremely high volatility
+        'STELLARDOGE': 0.038, # Stellar Doge - extremely high volatility
+        'NEBULADOGE': 0.039, # Nebula Doge - extremely high volatility
+        'QUANTUMDOGE': 0.040, # Quantum Doge - extremely high volatility
+        'HOLOGRAPHICDOGE': 0.041, # Holographic Doge - extremely high volatility
+        'NEURALDOGE': 0.042, # Neural Doge - extremely high volatility
+        'CYBERDOGE': 0.043, # Cyber Doge - extremely high volatility
+        'NANODOGE': 0.044, # Nano Doge - extremely high volatility
+        'PICODOGE': 0.045, # Pico Doge - extremely high volatility
+        'FEMTODOG': 0.046, # Femto Dog - extremely high volatility
+        'ATTODOG': 0.047,  # Atto Dog - extremely high volatility
+        'ZEPTODOG': 0.048, # Zepto Dog - extremely high volatility
+        'YOCTODOG': 0.049, # Yocto Dog - extremely high volatility
+        'PLANCKDOG': 0.050 # Planck Dog - extremely high volatility
     }
     
     # Get volatility for symbol, default to 0.002 if not in map
     volatility = vol_map.get(symbol, 0.002)
-    print(f"📊 Using volatility of {volatility:.3f} for {symbol}")
+    print(f"Using volatility of {volatility:.3f} for {symbol}")
     
     for i in range(num_rounds):
         # Random walk with symbol-specific volatility
@@ -300,7 +453,7 @@ def plot_results(rounds: List[int], pnl_history: List[float],
 
 def print_simulation_summary(bot: MarketMakingStrategy, order_book: OrderBook, market_data_info: dict) -> None:
     """Enhanced summary with market data source info and validation"""
-    print("\n🏁 SIMULATION COMPLETE!")
+    print("\nSIMULATION COMPLETE!")
     print("=" * 70)
     print(f"Symbol: {market_data_info.get('symbol', 'Unknown')}")
     print(f"Data Source: {market_data_info.get('primary_source', 'Unknown')}")
@@ -313,7 +466,7 @@ def print_simulation_summary(bot: MarketMakingStrategy, order_book: OrderBook, m
         print(f"Volatility: {validation.get('price_volatility', 0):.3f}")
         print(f"Price Range: ${validation.get('min_price', 0):.2f} - ${validation.get('max_price', 0):.2f}")
         if 'warning' in validation:
-            print(f"⚠️ {validation['warning']}")
+            print(f"Warning: {validation['warning']}")
     
     print(f"Final P&L: ${bot.pnl:.2f}")
     print(f"Final Cash: ${bot.cash:.2f}")
@@ -327,7 +480,7 @@ def print_simulation_summary(bot: MarketMakingStrategy, order_book: OrderBook, m
     
     # Show recent trades
     if order_book.trade_log:
-        print(f"\n📋 Recent Trade History:")
+        print(f"\nRecent Trade History:")
         recent_trades = order_book.trade_log[-5:]
         for i, trade in enumerate(recent_trades, 1):
             timestamp_str = f"{trade['timestamp']:.0f}"
@@ -359,23 +512,23 @@ def validate_market_data(market_data_stream: List[dict], symbol: str) -> dict:
         'price_volatility': price_volatility,
         'min_price': min_price,
         'max_price': max_price,
-        'message': f"✅ {symbol} data validated: {num_points} points from {data_source}"
+        'message': f"Success: {symbol} data validated: {num_points} points from {data_source}"
     }
     
     # Add warnings for potential issues
     if data_source == 'synthetic' and price_volatility < 0.01:
-        validation_info['warning'] = f"⚠️ Low volatility detected for {symbol} - may indicate similar patterns"
+        validation_info['warning'] = f"Low volatility detected for {symbol} - may indicate similar patterns"
     elif num_points < 10:
-        validation_info['warning'] = f"⚠️ Limited data points ({num_points}) for {symbol}"
+        validation_info['warning'] = f"Limited data points ({num_points}) for {symbol}"
     
     return validation_info
 
 def run_simulation():
-    print("🚀 Market Making Trading Bot Simulation with Real Market Data")
+    print("Market Making Trading Bot Simulation with Real Market Data")
     print("=" * 70)
 
     # Get symbol from user
-    symbol = input("📊 Enter stock symbol (default: AAPL): ").upper().strip()
+    symbol = input("Enter stock symbol (default: AAPL): ").upper().strip()
     if not symbol:
         symbol = "AAPL"
 
@@ -383,7 +536,7 @@ def run_simulation():
     initial_market_data = get_initial_price_and_quote(symbol)
     
     try:
-        num_rounds = int(input(f"\n🎯 Enter number of simulation rounds (default: 50): "))
+        num_rounds = int(input(f"\nEnter number of simulation rounds (default: 50): "))
     except (ValueError, EOFError):
         print("Using default of 50 rounds")
         num_rounds = 50
@@ -393,9 +546,9 @@ def run_simulation():
     
     # Validate market data quality
     validation_info = validate_market_data(market_data_stream, symbol)
-    print(f"\n📋 {validation_info['message']}")
+    print(f"\n{validation_info['message']}")
     if 'warning' in validation_info:
-        print(f"⚠️ {validation_info['warning']}")
+        print(f"Warning: {validation_info['warning']}")
     
     # Initialize trading components
     order_book = OrderBook()
@@ -413,7 +566,7 @@ def run_simulation():
     inventory_history: List[int] = []
     market_prices: List[float] = []
 
-    print(f"\n🎮 Running {min(num_rounds, len(market_data_stream))} rounds with {symbol} data...")
+    print(f"\nRunning {min(num_rounds, len(market_data_stream))} rounds with {symbol} data...")
     print("=" * 70)
 
     for round_num in range(1, min(num_rounds + 1, len(market_data_stream) + 1)):
@@ -424,26 +577,26 @@ def run_simulation():
         bid = market_data['bid']
         ask = market_data['ask']
 
-        print(f"\n🔄 Round {round_num}: {symbol} Price=${current_price:.2f}, Bid=${bid:.2f}, Ask=${ask:.2f}")
+        print(f"\nRound {round_num}: {symbol} Price=${current_price:.2f}, Bid=${bid:.2f}, Ask=${ask:.2f}")
         print(f"   Source: {market_data['source']}")
 
         # Bot places new limit orders
         bot_orders = bot.generate_orders(bid, ask, order_type="limit")
         for order in bot_orders:
             order_book.add_order(order)
-            print(f"🤖 Bot placed: {order}")
+            print(f"Bot placed: {order}")
 
         # Simulate market activity with realistic orders
         num_market_orders = random.randint(1, 3)
         for _ in range(num_market_orders):
             market_order = create_random_market_order(order_book, market_data)
             if market_order:
-                print(f"🌊 Market order: {market_order}")
+                print(f"Market order: {market_order}")
                 order_book.add_order(market_order)
 
         # Execute matching
         matches_made = order_book.match(current_price)
-        print(f"⚡ Made {matches_made} matches")
+        print(f"Made {matches_made} matches")
 
         # Track performance
         status = bot.get_status()
@@ -453,7 +606,7 @@ def run_simulation():
         inventory_history.append(status["inventory"])
         market_prices.append(current_price)
 
-        print(f"📈 Status: P&L=${status['pnl']:.2f}, Cash=${status['cash']:.2f}, Inventory={status['inventory']}")
+        print(f"Status: P&L=${status['pnl']:.2f}, Cash=${status['cash']:.2f}, Inventory={status['inventory']}")
         print("-" * 60)
         
         #time.sleep(1)  # Add a 1-second delay between rounds
@@ -471,16 +624,16 @@ def run_simulation():
     print_simulation_summary(bot, order_book, market_data_info)
     order_book.print_book()
 
-    print("\n📊 Generating performance charts...")
+    print("\nGenerating performance charts...")
     plot_results(rounds, pnl_history, cash_history, inventory_history, 
                 order_book.trade_log, market_prices)
 
     # Export data
-    export_choice = input("\n💾 Export order and trade history to CSV? (y/n): ").lower().strip()
+    export_choice = input("\nExport order and trade history to CSV? (y/n): ").lower().strip()
     if export_choice == 'y':
         order_book.export_orders(f"{symbol}_order_history.csv")
         order_book.export_trades(f"{symbol}_trade_history.csv")
-        print("✅ Data exported successfully!")
+        print("Data exported successfully!")
 
 # --- PATCH OrderBook.match for partial/missed fills ---
 def match_with_realism(self, current_price):
@@ -527,7 +680,7 @@ OrderBook.match = match_with_realism
 if __name__ == "__main__":
     while True:
         run_simulation()
-        cont = input("\n🔄 Run another simulation? (y/n): ").lower().strip()
+        cont = input("\nRun another simulation? (y/n): ").lower().strip()
         if cont != 'y':
             print("Thanks for using the Market Making Bot! Goodbye!")
             break
