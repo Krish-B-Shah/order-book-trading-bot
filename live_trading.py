@@ -1,5 +1,6 @@
 import logging
 import sys
+import time
 from datetime import datetime
 from typing import Optional, Any
 from dataclasses import dataclass
@@ -938,10 +939,11 @@ class EnhancedMarketMaker:
             self.trade_history.pop(0)
     
     def calculate_sharpe_ratio(self):
-        """Calculate Sharpe ratio of recent trades"""
+        """Calculate Sharpe ratio with proper methodology"""
         if len(self.trade_history) < 2:
             return 0.0
         
+        # Calculate period returns from equity values
         returns = []
         for i in range(1, len(self.trade_history)):
             prev_equity = self.trade_history[i-1]['equity']
@@ -954,11 +956,24 @@ class EnhancedMarketMaker:
             return 0.0
         
         import statistics
-        avg_return = statistics.mean(returns)
-        std_return = statistics.stdev(returns)
+        import math
         
-        if std_return > 0:
-            return avg_return / std_return
+        # Assume daily trading frequency (252 trading days per year)
+        # Adjust this based on your actual trading frequency
+        periods_per_year = 252
+        risk_free_rate = 0.02  # 2% annual risk-free rate
+        daily_rf_rate = risk_free_rate / periods_per_year
+        
+        # Calculate excess returns
+        excess_returns = [ret - daily_rf_rate for ret in returns]
+        
+        avg_excess_return = statistics.mean(excess_returns)
+        std_excess_return = statistics.stdev(excess_returns) if len(excess_returns) > 1 else 0
+        
+        if std_excess_return > 0:
+            # Annualized Sharpe ratio
+            sharpe = avg_excess_return / std_excess_return * math.sqrt(periods_per_year)
+            return round(sharpe, 3)
         return 0.0
     
     def print_performance_summary(self):
