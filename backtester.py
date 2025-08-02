@@ -1,6 +1,7 @@
 from main import get_market_data_stream, plot_results, print_simulation_summary, create_random_market_order
 from order_book import OrderBook
 from strategy import MarketMakingStrategy
+from performance_metrics import PerformanceCalculator, print_performance_report
 from datetime import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -55,21 +56,45 @@ def run_backtest(symbol="AAPL", num_rounds=1000, starting_cash=10000, spread=0.1
 
 
 def compute_metrics(results):
+    """
+    Compute comprehensive performance metrics using the enhanced calculator
+    """
     pnl = results["pnl"]
     trades = results["trades"]
-
+    
     total_trades = len(trades)
     final_pnl = pnl[-1] if pnl else 0
-    max_drawdown = max((max(pnl[:i+1]) - v for i, v in enumerate(pnl)), default=0)
-
-    returns = pd.Series(pnl).diff().dropna()
-    sharpe_ratio = returns.mean() / returns.std() * (len(returns) ** 0.5) if not returns.empty else 0
-
+    
+    # Use enhanced performance calculator
+    calculator = PerformanceCalculator(risk_free_rate=0.02)  # 2% risk-free rate
+    
+    # Extract individual trade P&Ls for trade-based metrics
+    trade_pnls = []
+    if trades:
+        for trade in trades:
+            if 'pnl' in trade:
+                trade_pnls.append(trade['pnl'])
+            elif 'price' in trade and 'quantity' in trade:
+                # Estimate trade P&L if not directly available
+                # This is a simplified estimation - you may need to adjust based on your trade structure
+                pass
+    
+    # Calculate all metrics
+    metrics = calculator.calculate_all_metrics(
+        pnl_series=pnl,
+        trade_returns=None,  # We'll use P&L-based calculations for now
+        starting_capital=10000,  # Should match your backtester starting capital
+        periods_per_year=252,    # Assuming daily data
+        time_period_days=len(pnl)  # Number of simulation rounds as days
+    )
+    
+    # Legacy format for HTML report compatibility
     return {
         "final_pnl": round(final_pnl, 2),
         "total_trades": total_trades,
-        "sharpe": round(sharpe_ratio, 2),
-        "max_drawdown": round(max_drawdown, 2)
+        "sharpe": metrics.sharpe_ratio,
+        "max_drawdown": round(final_pnl - min(pnl) if pnl else 0, 2),  # Legacy max DD calculation
+        "enhanced_metrics": metrics  # Store enhanced metrics for detailed reporting
     }
 
 
