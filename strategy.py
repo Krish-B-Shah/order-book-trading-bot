@@ -3,13 +3,21 @@ from typing import List, Dict, Any, Optional
 
 class MarketMakingStrategy:
     def __init__(self, starting_cash: float = 10000, order_book: Optional[OrderBook] = None, 
-                 max_inventory: int = 10, spread: float = 2.0):
+                 max_inventory: int = 10, spread: float = 2.0, transaction_cost: float = 0.005):
+        """
+        Initialize market making strategy with realistic parameters
+        
+        Args:
+            spread: Bid-ask spread in dollars (default: $2.00)
+            transaction_cost: Transaction cost per share in dollars (default: $0.005)
+        """
         self.starting_cash = starting_cash
         self.cash = starting_cash
         self.inventory = 0
         self.pnl = 0.0
         self.max_inventory = max_inventory
         self.spread = spread
+        self.transaction_cost = transaction_cost  # Add transaction costs
         self.order_book = order_book
         self.active_orders: List[int] = []  # Track active order IDs
         
@@ -78,13 +86,17 @@ class MarketMakingStrategy:
         return orders
 
     def updateProfitAndLoss(self, trade_price, trade_quantity, side, current_price):
-        """Execute a trade and update position/cash with performance tracking"""
+        """Execute a trade and update position/cash with performance tracking and transaction costs"""
+        
+        # Apply transaction costs
+        transaction_fee = trade_quantity * self.transaction_cost
+        
         if side == "buy":
             self.inventory += trade_quantity
-            self.cash -= trade_price * trade_quantity
+            self.cash -= (trade_price * trade_quantity) + transaction_fee  # Include transaction cost
         elif side == "sell":
             self.inventory -= trade_quantity
-            self.cash += trade_price * trade_quantity
+            self.cash += (trade_price * trade_quantity) - transaction_fee  # Include transaction cost
 
         # Calculate unrealized P&L based on last trade price
         last_price = self.order_book.get_last_trade_price() if self.order_book else 100.0
@@ -107,7 +119,7 @@ class MarketMakingStrategy:
             self.pnl -= penalty
             print(f"⚠️ Inventory penalty applied: -${penalty:.2f} (Inventory: {self.inventory})")
 
-        print(f"💰 Trade executed: {side.upper()} {trade_quantity} @ ${trade_price:.2f}")
+        print(f"💰 Trade executed: {side.upper()} {trade_quantity} @ ${trade_price:.2f} (Fee: ${transaction_fee:.3f})")
         print(f"📊 Cash: ${self.cash:.2f} | Inventory: {self.inventory} | P&L: ${self.pnl:.2f} | Trade P&L: ${trade_pnl:.2f}")
 
     def calculate_volatility(self, current_price):

@@ -8,10 +8,17 @@ import pandas as pd
 import os
 
 
-def run_backtest(symbol="AAPL", num_rounds=1000, starting_cash=10000, spread=0.10):
+def run_backtest(symbol="AAPL", num_rounds=1000, starting_cash=10000, spread=2.00, transaction_cost=0.005):
+    """
+    Run backtest with realistic parameters
+    
+    Args:
+        spread: Bid-ask spread in dollars (default: $2.00 for AAPL)
+        transaction_cost: Transaction cost per share (default: $0.005 = 0.5 cents)
+    """
     market_data = get_market_data_stream(symbol, num_rounds)
     order_book = OrderBook()
-    bot = MarketMakingStrategy(starting_cash=starting_cash, order_book=order_book, max_inventory=10, spread=spread)
+    bot = MarketMakingStrategy(starting_cash=starting_cash, order_book=order_book, max_inventory=10, spread=spread, transaction_cost=transaction_cost)
 
     rounds = []
     pnl_history = []
@@ -29,8 +36,10 @@ def run_backtest(symbol="AAPL", num_rounds=1000, starting_cash=10000, spread=0.1
         for order in bot_orders:
             order_book.add_order(order)
 
-        # Simulate 2 market orders per round
-        for _ in range(2):
+        # Simulate market orders with reduced frequency (more realistic)
+        # Only generate market orders 30% of the time to avoid excessive trading
+        import random
+        if random.random() < 0.3:  # 30% chance of market activity per round
             order = create_random_market_order(order_book, data)
             if order is not None:
                 order_book.add_order(order)
@@ -217,9 +226,12 @@ def generate_html_report(symbol, metrics):
 
 if __name__ == "__main__":
     symbol = input("Enter symbol (default: AAPL): ").strip().upper() or "AAPL"
-    num_rounds = int(input("Enter number of rounds (default: 1000): ") or 1000)
-    print("🚀 Running Backtest...")
-    results = run_backtest(symbol=symbol, num_rounds=num_rounds)
+    num_rounds = int(input("Enter number of rounds (default: 500): ") or 500)  # Reduced default rounds
+    spread = float(input("Enter spread in dollars (default: 2.00): ") or 2.00)  # Realistic spread
+    print("🚀 Running Backtest with more realistic parameters...")
+    print(f"📊 Symbol: {symbol}, Rounds: {num_rounds}, Spread: ${spread:.2f}")
+    
+    results = run_backtest(symbol=symbol, num_rounds=num_rounds, spread=spread)
     print("📈 Plotting Results...")
     plt.ioff()
     plot_results(results["rounds"], results["pnl"], results["cash"], results["inventory"], results["trades"], results["prices"])

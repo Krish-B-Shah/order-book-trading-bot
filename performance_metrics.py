@@ -1,3 +1,4 @@
+
 """
 Enhanced Performance Metrics Module
 Provides accurate calculation of trading performance metrics including Sharpe ratio,
