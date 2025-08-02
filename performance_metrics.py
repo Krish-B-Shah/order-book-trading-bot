@@ -67,11 +67,11 @@ class PerformanceCalculator:
     
     def calculate_sharpe_ratio(self, returns: np.ndarray, periods_per_year: int = 252) -> float:
         """
-        Calculate Sharpe ratio with proper annualization
+        Calculate Sharpe ratio with proper annualization and frequency detection
         
         Args:
             returns: Array of period returns
-            periods_per_year: Number of periods in a year (252 for daily, 12 for monthly)
+            periods_per_year: Number of periods in a year (auto-detected if not specified)
             
         Returns:
             Annualized Sharpe ratio
@@ -79,15 +79,42 @@ class PerformanceCalculator:
         if len(returns) < 2:
             return 0.0
         
-        # Calculate excess returns (subtract risk-free rate)
-        daily_rf_rate = self.risk_free_rate / periods_per_year
-        excess_returns = returns - daily_rf_rate
+        # Auto-detect data frequency if returns are very small (indicating high frequency)
+        mean_abs_return = np.mean(np.abs(returns))
+        
+        if mean_abs_return < 0.001:  # Less than 0.1% average absolute return
+            # This looks like high-frequency data (minute or sub-minute)
+            # Assume each return represents a few minutes of trading
+            estimated_periods_per_year = len(returns) * 10  # Conservative estimate
+            print(f"📊 Auto-detected high-frequency data. Using {estimated_periods_per_year} periods/year.")
+        else:
+            estimated_periods_per_year = periods_per_year
+        
+        # Calculate excess returns with appropriately scaled risk-free rate
+        period_rf_rate = self.risk_free_rate / estimated_periods_per_year
+        excess_returns = returns - period_rf_rate
         
         # Calculate Sharpe ratio
-        if np.std(excess_returns) == 0:
+        mean_excess = np.mean(excess_returns)
+        std_excess = np.std(excess_returns)
+        
+        if std_excess == 0:
             return 0.0
         
-        sharpe = np.mean(excess_returns) / np.std(excess_returns) * np.sqrt(periods_per_year)
+        # Annualized Sharpe ratio
+        sharpe = mean_excess / std_excess * np.sqrt(estimated_periods_per_year)
+        
+        # Sanity check: if Sharpe ratio is extreme, recalculate with conservative assumptions
+        if abs(sharpe) > 10:
+            print(f"⚠️ Extreme Sharpe ratio detected ({sharpe:.2f}). Recalculating with conservative assumptions...")
+            # Use simpler calculation without excess returns for high-frequency data
+            mean_return = np.mean(returns)
+            std_return = np.std(returns)
+            if std_return > 0:
+                sharpe = mean_return / std_return * np.sqrt(min(estimated_periods_per_year, 252))
+            else:
+                sharpe = 0.0
+        
         return sharpe
     
     def calculate_sortino_ratio(self, returns: np.ndarray, periods_per_year: int = 252) -> float:

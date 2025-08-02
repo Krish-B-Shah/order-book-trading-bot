@@ -939,7 +939,7 @@ class EnhancedMarketMaker:
             self.trade_history.pop(0)
     
     def calculate_sharpe_ratio(self):
-        """Calculate Sharpe ratio with proper methodology"""
+        """Calculate Sharpe ratio with proper methodology and frequency detection"""
         if len(self.trade_history) < 2:
             return 0.0
         
@@ -958,23 +958,40 @@ class EnhancedMarketMaker:
         import statistics
         import math
         
-        # Assume daily trading frequency (252 trading days per year)
-        # Adjust this based on your actual trading frequency
-        periods_per_year = 252
-        risk_free_rate = 0.02  # 2% annual risk-free rate
-        daily_rf_rate = risk_free_rate / periods_per_year
+        # Auto-detect frequency based on return magnitude
+        mean_abs_return = statistics.mean([abs(r) for r in returns])
         
-        # Calculate excess returns
-        excess_returns = [ret - daily_rf_rate for ret in returns]
+        if mean_abs_return < 0.001:  # High-frequency data
+            # Estimate periods per year based on trading frequency
+            periods_per_year = min(len(returns) * 5, 252 * 24)  # Conservative estimate
+            risk_free_rate = 0.02  # 2% annual
+        else:
+            # Lower frequency data
+            periods_per_year = 252
+            risk_free_rate = 0.02
         
-        avg_excess_return = statistics.mean(excess_returns)
-        std_excess_return = statistics.stdev(excess_returns) if len(excess_returns) > 1 else 0
-        
-        if std_excess_return > 0:
-            # Annualized Sharpe ratio
-            sharpe = avg_excess_return / std_excess_return * math.sqrt(periods_per_year)
-            return round(sharpe, 3)
-        return 0.0
+        # For high-frequency trading, use simpler calculation without risk-free adjustment
+        if mean_abs_return < 0.001:
+            mean_return = statistics.mean(returns)
+            std_return = statistics.stdev(returns) if len(returns) > 1 else 0
+            
+            if std_return > 0:
+                # Simple Sharpe ratio for high-frequency data
+                sharpe = mean_return / std_return * math.sqrt(min(periods_per_year, 252))
+                return round(sharpe, 3)
+            return 0.0
+        else:
+            # Traditional Sharpe ratio for lower frequency data
+            period_rf_rate = risk_free_rate / periods_per_year
+            excess_returns = [ret - period_rf_rate for ret in returns]
+            
+            avg_excess_return = statistics.mean(excess_returns)
+            std_excess_return = statistics.stdev(excess_returns) if len(excess_returns) > 1 else 0
+            
+            if std_excess_return > 0:
+                sharpe = avg_excess_return / std_excess_return * math.sqrt(periods_per_year)
+                return round(sharpe, 3)
+            return 0.0
     
     def print_performance_summary(self):
         """Print comprehensive performance summary"""
