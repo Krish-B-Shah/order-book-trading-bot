@@ -60,9 +60,12 @@ class PerformanceCalculator:
         # Calculate returns
         returns = []
         for i in range(1, len(equity_values)):
-            if equity_values[i-1] > 0:
-                ret = (equity_values[i] - equity_values[i-1]) / equity_values[i-1]
-                returns.append(ret)
+            prev_equity = equity_values[i-1]
+            if prev_equity > 0:
+                ret = (equity_values[i] - prev_equity) / prev_equity
+                # Protect against division by zero or extreme values
+                if np.isfinite(ret):
+                    returns.append(ret)
         
         return np.array(returns)
     
@@ -138,7 +141,9 @@ class PerformanceCalculator:
         # Calculate downside deviation
         downside_returns = excess_returns[excess_returns < 0]
         if len(downside_returns) == 0:
-            return float('inf') if np.mean(excess_returns) > 0 else 0.0
+            # No downside deviation, so Sortino is extremely high
+            # Cap to a large value for reporting stability
+            return 10.0 if np.mean(excess_returns) > 0 else 0.0
         
         downside_std = np.std(downside_returns)
         if downside_std == 0:
