@@ -199,7 +199,7 @@ class PerformanceCalculator:
         gross_loss = abs(sum(ret for ret in trade_returns if ret < 0))
         
         if gross_loss == 0:
-            return float('inf') if gross_profit > 0 else 1.0
+            return 1000.0 if gross_profit > 0 else 1.0  # Cap instead of infinity
         
         return gross_profit / gross_loss
     
@@ -236,12 +236,19 @@ class PerformanceCalculator:
         equity_curve = [starting_capital + pnl for pnl in pnl_series]
         
         # Basic metrics
-        total_return = (equity_curve[-1] - equity_curve[0]) / equity_curve[0] if equity_curve else 0.0
+        total_return = (equity_curve[-1] - equity_curve[0]) / equity_curve[0] if equity_curve and equity_curve[0] != 0 else 0.0
         
         # Annualized return
         if time_period_days and time_period_days > 0:
             years = time_period_days / 365.25
-            annualized_return = (1 + total_return) ** (1/years) - 1
+            # Protect against math domain errors
+            if years > 0 and (1 + total_return) > 0:
+                try:
+                    annualized_return = (1 + total_return) ** (1/years) - 1
+                except (ValueError, OverflowError, ZeroDivisionError):
+                    annualized_return = 0.0
+            else:
+                annualized_return = 0.0
         else:
             annualized_return = total_return * (periods_per_year / len(returns)) if len(returns) > 0 else 0.0
         
@@ -264,6 +271,9 @@ class PerformanceCalculator:
         
         # Value at Risk
         var_95 = self.calculate_var(returns, 0.95)
+        # If all returns are positive, VaR is not meaningful (no risk of loss)
+        if len(returns) > 0 and np.all(returns >= 0):
+            var_95 = 0.0
         
         return PerformanceMetrics(
             sharpe_ratio=round(sharpe_ratio, 3),
@@ -292,7 +302,8 @@ def print_performance_report(metrics: PerformanceMetrics):
     
     print(f"\n⚡ RISK-ADJUSTED METRICS:")
     print(f"   Sharpe Ratio:        {metrics.sharpe_ratio:>8.3f}")
-    print(f"   Sortino Ratio:       {metrics.sortino_ratio:>8.3f}")
+    sortino_display = f"{metrics.sortino_ratio:>8.3f}" if metrics.sortino_ratio < 10 else ">10.000"
+    print(f"   Sortino Ratio:       {sortino_display}")
     print(f"   Calmar Ratio:        {metrics.calmar_ratio:>8.3f}")
     
     print(f"\n📉 RISK METRICS:")
@@ -303,7 +314,8 @@ def print_performance_report(metrics: PerformanceMetrics):
     
     print(f"\n🎯 TRADE METRICS:")
     print(f"   Win Rate:            {metrics.win_rate:>8.2f}%")
-    print(f"   Profit Factor:       {metrics.profit_factor:>8.3f}")
+    profit_factor_display = f"{metrics.profit_factor:>8.3f}" if metrics.profit_factor < 1000 else ">1000.0"
+    print(f"   Profit Factor:       {profit_factor_display}")
     
     print("="*60)
     
