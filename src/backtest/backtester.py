@@ -1,7 +1,8 @@
-from main import get_market_data_stream, plot_results, print_simulation_summary, create_random_market_order
-from src.order_book import OrderBook
-from strategy import MarketMakingStrategy
-from performance_metrics import PerformanceCalculator, print_performance_report
+from main import get_market_data_stream, plot_results, print_simulation_summary
+from core.order_book import OrderBook
+from strategies.market_maker import MarketMakingStrategy
+from backtest.analytics import PerformanceCalculator, print_performance_report
+from backtest.execution_sim import create_random_market_order
 from datetime import datetime
 import matplotlib.pyplot as plt
 import pandas as pd

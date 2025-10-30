@@ -38,16 +38,41 @@ Inspired by real-world trading infrastructure, this project is ideal for experim
 
 ```
 order-book-trading-bot/
-├── main.py           # Main simulation loop (interactive)
-├── backtester.py     # Automated backtesting and reporting
-├── order_book.py     # Core Order and OrderBook logic
-├── strategy.py       # Market-making strategy logic
-├── live_trading.py   # Live trading bot (Alpaca integration)
-├── config.py         # API keys and configuration
-├── README.md         # You're reading it
-├── assets/
-│   └── pnl-chart.png # Sample P&L output
-└── ... (other files)
+├── src/
+│   ├── core/
+│   │   ├── order_book.py
+│   │   ├── order.py
+│   │   ├── matching_engine.py
+│   │   └── utils.py
+│   ├── strategies/
+│   │   ├── market_maker.py
+│   │   └── mean_reversion.py   # if you have one later
+│   ├── backtest/
+│   │   ├── backtester.py
+│   │   ├── execution_sim.py
+│   │   └── analytics.py
+│   └── main.py
+│
+├── tests/
+│   ├── test_order_book.py
+│   ├── test_matching_engine.py
+│   └── test_strategy.py
+│
+├── data/
+│   └── sample_orders.csv
+│
+├── logs/
+│   └── execution.log
+│
+├── notebooks/        # research + plotting only
+│   └── research.ipynb
+│
+├── assets/          # charts, reports
+│   └── *.png
+│
+├── README.md
+├── requirements.txt
+├── .gitignore
 ```
 
 ---

@@ -1,5 +1,5 @@
-from src.order_book import Order, OrderBook
-from strategy import MarketMakingStrategy
+from core.order_book import Order, OrderBook
+from strategies.market_maker import MarketMakingStrategy
 from matplotlib import pyplot as plt
 from typing import List
 import random
