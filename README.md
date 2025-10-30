@@ -1,127 +1,66 @@
-# 🧠 High-Frequency Trading Simulator & Live Trading Bot
+# Order Book Trading Bot
 
-This Python project simulates a high-frequency trading (HFT) environment with a realistic order book, market-making bot, and backtesting/visualization tools. It also includes a live trading module for real broker integration (Alpaca).
+This project implements a market making trading bot with order book management, supporting both Python and C++ implementations.
 
-Inspired by real-world trading infrastructure, this project is ideal for experimenting with algorithmic strategies, market microstructure, and even live trading (with caution).
-
----
-
-## 🚀 Features
-
-- 📥 **Limit & Market Order Support**  
-  Realistic trading actions through market and limit orders with full lifecycle tracking.
-
-- ⚖️ **Priority-Based Matching**  
-  Heap queues enforce strict price-time priority for bid/ask execution.
-
-- 📊 **P&L Tracking**  
-  Tracks cash, inventory, and unrealized gains/losses in real time per strategy agent.
-
-- 🤖 **Bot Strategy Integration**  
-  Plug in market-making strategies with inventory control and reactive logic.
-
-- 📈 **Performance Visualization**  
-  P&L, cash, inventory, and trade prices visualized round-by-round using `matplotlib`.
-
-- 🧪 **Simulation with Noise**  
-  Simulates realistic price movement using randomized spread, price drift, and symbol-specific volatility.
-
-- 🧩 **Backtesting & Reporting**  
-  Automated backtesting with HTML and PNG report generation.
-
-- 🔌 **Live Trading (Alpaca)**  
-  `live_trading.py` allows you to connect to Alpaca and trade live (paper or real money) with advanced risk controls and logging.
-
----
-
-## 📂 Project Structure
+## Project Structure
 
 ```
-order-book-trading-bot/
-├── src/
-│   ├── core/
-│   │   ├── order_book.py
-│   │   ├── order.py
-│   │   ├── matching_engine.py
-│   │   └── utils.py
-│   ├── strategies/
-│   │   ├── market_maker.py
-│   │   └── mean_reversion.py   # if you have one later
-│   ├── backtest/
-│   │   ├── backtester.py
-│   │   ├── execution_sim.py
-│   │   └── analytics.py
-│   └── main.py
-│
-├── tests/
-│   ├── test_order_book.py
-│   ├── test_matching_engine.py
-│   └── test_strategy.py
-│
-├── data/
-│   └── sample_orders.csv
-│
-├── logs/
-│   └── execution.log
-│
-├── notebooks/        # research + plotting only
-│   └── research.ipynb
-│
-├── assets/          # charts, reports
-│   └── *.png
-│
-├── README.md
-├── requirements.txt
-├── .gitignore
+project-root/
+├── python/              # All Python code
+│   ├── src/             # Source code
+│   ├── tests/           # Unit tests
+│   └── scripts/         # Utility scripts
+│   └── requirements.txt # Python dependencies
+├── cpp/                 # All C++ code
+│   ├── include/         # Header files
+│   ├── src/             # Implementation files
+│   └── tests/           # Unit tests or small executables
+├── docs/                # Documentation and assets
+│   ├── assets/          # Charts, reports, images
+│   ├── data/            # Sample data files
+│   ├── logs/            # Log files
+│   ├── notebooks/       # Jupyter notebooks
+│   ├── README.md        # Original README
+│   └── .gitignore       # Git ignore rules
+└── README.md            # This file
 ```
 
----
+## Getting Started
 
-## 🧠 How It Works
+### Python Implementation
 
-- **Order Book:**  
-  Simulates a real exchange with price-time priority, partial/missed fills, and trade logging.
+1. Navigate to the python directory:
+   ```bash
+   cd python
+   ```
 
-- **Market Data:**  
-  Uses Alpaca historical data, yfinance, or synthetic data (with symbol-specific volatility).
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-- **Market-Making Bot:**  
-  Places buy/sell orders, manages inventory, and is penalized for excessive risk. Easily extensible for new strategies.
+3. Run the simulation:
+   ```bash
+   python src/main.py
+   ```
 
-- **Simulation & Backtesting:**  
-  Run interactive or automated simulations, visualize results, and generate performance reports.
+### C++ Implementation
 
-- **Live Trading:**  
-  `live_trading.py` can connect to Alpaca for real or paper trading. Includes interactive setup, risk management, and advanced logging. **Use with caution and real API keys only if you understand the risks.**
+1. Navigate to the cpp directory:
+   ```bash
+   cd cpp
+   ```
 
----
+2. Compile the code (assuming you have a build system set up).
 
-## ⚠️ Simulation vs. Live Trading
+## Features
 
-- **main.py** and **backtester.py** are **simulated**—no real money is at risk.
-- **live_trading.py** can place real trades if configured with valid API keys.  
-  - By default, it uses Alpaca's paper trading mode.
-  - Review and test thoroughly before using with real funds.
+- Real-time market data integration (Alpaca API)
+- Order book management
+- Market making strategies
+- Backtesting capabilities
+- Performance visualization
 
----
+## Documentation
 
-## 🛠️ Extending the Project
-
-- Add new strategies (momentum, arbitrage, etc.) in `strategy.py`.
-- Plug in new data sources or execution logic.
-- Simulate multiple bots/agents.
-- Integrate with a web dashboard for live monitoring.
-
----
-
-## 👤 Author
-
-Krish B. Shah  
-📫 krshah828@gmail.com  
-🔗 [LinkedIn](#)  
-💻 [GitHub](#)  
-
----
-
-**For questions, contributions, or to report issues, please open an issue or contact the author.**
-
+See `docs/README.md` for detailed documentation.
